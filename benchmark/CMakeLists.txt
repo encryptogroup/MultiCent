@@ -14,6 +14,7 @@ add_benchmark(shuffle)
 add_benchmark(chase_shuffle)
 add_benchmark(scatter)
 add_benchmark(gather)
+add_benchmark(comparison)
 
 add_custom_target(benchmarks)
 add_dependencies(benchmarks ${benchbin})

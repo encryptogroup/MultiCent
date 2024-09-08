@@ -104,20 +104,17 @@ void benchmark(const bpo::variables_map& opts) {
     std::unordered_map<common::utils::wire_t, Ring> input_map;
     std::unordered_map<common::utils::wire_t, Ring> inputs;
 
-    std::cout << "--- 111 ---\n";
     auto& g1 = circ.gates_by_level[0][0];
     input_pid_map[g1->out] = 1;
     input_map[g1->out] = 1;
     inputs[g1->out] = 5;
 
-    std::cout << "--- 222 ---\n";
 
     auto& g2 = circ.gates_by_level[0][0];
     input_pid_map[g2->out] = 2;
     input_map[g2->out] = 2;
     inputs[g2->out] = 5;
 
-    std::cout << "--- 333 ---\n";
     // for (const auto& g : circ.gates_by_level[0]) {
     //     if (g->type == common::utils::GateType::kInp) {
     //     input_pid_map[g->out] = 1;
@@ -137,9 +134,8 @@ void benchmark(const bpo::variables_map& opts) {
         OnlineEvaluator eval(pid, network, std::move(preproc), circ, 
                     threads, seed);
         
-        std::cout << "--- 444 ---\n";
         eval.setRandomInputs();
-        std::cout << "--- 555 ---\n";
+
         StatsPoint start(*network);
         // network->sync();
         
@@ -154,7 +150,6 @@ void benchmark(const bpo::variables_map& opts) {
         auto res = eval.evaluateCircuit(input_map);
         std::cout << res[0] <<"--- outvals ---\n";
 
-        std::cout << "--- 666 ---\n";
         StatsPoint end(*network);
         auto rbench = end - start;
         output_data["benchmarks"].push_back(rbench);

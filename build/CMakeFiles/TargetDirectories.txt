@@ -1,0 +1,15 @@
+/home/cris/Desktop/Bhavish/Graphiti/build/CMakeFiles/edit_cache.dir
+/home/cris/Desktop/Bhavish/Graphiti/build/CMakeFiles/rebuild_cache.dir
+/home/cris/Desktop/Bhavish/Graphiti/build/src/CMakeFiles/Asterisk.dir
+/home/cris/Desktop/Bhavish/Graphiti/build/src/CMakeFiles/edit_cache.dir
+/home/cris/Desktop/Bhavish/Graphiti/build/src/CMakeFiles/rebuild_cache.dir
+/home/cris/Desktop/Bhavish/Graphiti/build/benchmark/CMakeFiles/graphsc_mpc.dir
+/home/cris/Desktop/Bhavish/Graphiti/build/benchmark/CMakeFiles/mult.dir
+/home/cris/Desktop/Bhavish/Graphiti/build/benchmark/CMakeFiles/shuffle.dir
+/home/cris/Desktop/Bhavish/Graphiti/build/benchmark/CMakeFiles/chase_shuffle.dir
+/home/cris/Desktop/Bhavish/Graphiti/build/benchmark/CMakeFiles/scatter.dir
+/home/cris/Desktop/Bhavish/Graphiti/build/benchmark/CMakeFiles/gather.dir
+/home/cris/Desktop/Bhavish/Graphiti/build/benchmark/CMakeFiles/comparison.dir
+/home/cris/Desktop/Bhavish/Graphiti/build/benchmark/CMakeFiles/benchmarks.dir
+/home/cris/Desktop/Bhavish/Graphiti/build/benchmark/CMakeFiles/edit_cache.dir
+/home/cris/Desktop/Bhavish/Graphiti/build/benchmark/CMakeFiles/rebuild_cache.dir
