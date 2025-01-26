@@ -15,46 +15,48 @@ using namespace graphsc;
 using json = nlohmann::json;
 namespace bpo = boost::program_options;
 
-
 common::utils::Circuit<Ring> generateCircuit(size_t vec_size) {
+
+    std::cout << "Generating circuit" << std::endl;
+
+    std::vector<std::vector<int>> permutation;
+    std::vector<int> tmp_perm(vec_size);
+    for (int i = 0; i < vec_size; ++i) {
+        tmp_perm[i] = i;
+    }
     
     common::utils::Circuit<Ring> circ;
 
-    std::vector<common::utils::wire_t> level_inputs(vec_size);
-    std::generate(level_inputs.begin(), level_inputs.end(),
-                [&]() { return circ.newInputWire(); });
+    int num_vert = vec_size * 0.1;
+    int num_edge = vec_size - num_vert;
 
-    std::vector<common::utils::wire_t> level_outputs(vec_size);
+    std::vector<common::utils::wire_t> dag_list(vec_size);
+    std::generate(dag_list.begin(), dag_list.end(), [&]() { return circ.newInputWire(); });
 
-    for (size_t i = 1; i < vec_size; ++i) {
-            level_inputs[i] = circ.addGate(common::utils::GateType::kAdd, level_inputs[i],
-                                      level_inputs[i - 1]);
+
+    // GATHER
+    std::vector<common::utils::wire_t> dst_list(vec_size);
+    for (int i = 1; i < vec_size; ++i) {
+        dst_list[i] = circ.addGate(common::utils::GateType::kAdd, dag_list[i], dag_list[i - 1]);
     }
-
-
-    auto outs = circ.addMGate(common::utils::GateType::kShuffle, level_inputs);
-    for(int i = 0; i<vec_size; ++i){
-        level_outputs[i] = outs[i];
-    }
-
-    for (size_t i = vec_size/4; i > 0; --i) {
-            level_inputs[i] = circ.addGate(common::utils::GateType::kSub, level_inputs[i],
-                                      level_inputs[i - 1]);
-    }
-
-
-    // level_outputs.insert(level_outputs.begin(), outs.begin(), outs.end());
+    auto tmp2 = circ.addMGate(common::utils::GateType::kShuffle, dst_list);
+    std::vector<common::utils::wire_t> gather_list(vec_size);
     
-    
-    level_inputs = std::move(level_outputs);
+    // apply public permutation
+    for (int i = 0; i < vec_size; ++i){
+        gather_list[i] = tmp2[i];
+    }
 
-    for (auto i : level_inputs) {
-        circ.setAsOutput(i);
+    for (int i = vec_size - 1; i > 0; --i) {
+        gather_list[i] = circ.addGate(common::utils::GateType::kSub, gather_list[i], gather_list[i - 1]);
+    }
+
+    for (int i = 0; i < gather_list.size(); ++i) {
+        circ.setAsOutput(gather_list[i]);
     }
 
     return circ;
 }
-
 
 void benchmark(const bpo::variables_map& opts) {
 

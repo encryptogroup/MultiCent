@@ -15,45 +15,53 @@ using namespace graphsc;
 using json = nlohmann::json;
 namespace bpo = boost::program_options;
 
-
 common::utils::Circuit<Ring> generateCircuit(size_t vec_size) {
+
+    std::cout << "Generating circuit" << std::endl;
+
+    std::vector<std::vector<int>> permutation;
+    std::vector<int> tmp_perm(vec_size);
+    for (int i = 0; i < vec_size; ++i) {
+        tmp_perm[i] = i;
+    }
     
     common::utils::Circuit<Ring> circ;
 
-    std::vector<common::utils::wire_t> level_inputs(vec_size);
-    std::generate(level_inputs.begin(), level_inputs.end(),
-                [&]() { return circ.newInputWire(); });
+    int num_vert = vec_size * 0.1;
+    int num_edge = vec_size - num_vert;
 
-    std::vector<common::utils::wire_t> level_outputs(vec_size);
+    std::vector<common::utils::wire_t> dag_list(vec_size);
+    std::generate(dag_list.begin(), dag_list.end(), [&]() { return circ.newInputWire(); });
 
-    for (size_t i = vec_size/4; i > 0; --i) {
-            level_inputs[i] = circ.addGate(common::utils::GateType::kSub, level_inputs[i],
-                                      level_inputs[i - 1]);
+
+    // PROPAGATE
+    for (int i = num_vert - 1; i > 0; --i) {
+        dag_list[i] = circ.addGate(common::utils::GateType::kSub, dag_list[i], dag_list[i - 1]);
     }
-
-    auto outs = circ.addMGate(common::utils::GateType::kShuffle, level_inputs);
-    for(int i = 0; i<vec_size; ++i){
-        level_outputs[i] = outs[i];
-    }
-
-    for (size_t i = vec_size-1; i > 0; --i) {
-            level_inputs[i] = circ.addGate(common::utils::GateType::kAdd, level_inputs[i],
-                                      level_inputs[i - 1]);
-    }
-
-
-    // level_outputs.insert(level_outputs.begin(), outs.begin(), outs.end());
     
-    
-    level_inputs = std::move(level_outputs);
+    auto tmp1 = circ.addMGate(common::utils::GateType::kShuffle, dag_list);
+    std::vector<common::utils::wire_t> propagate_list(vec_size);
 
-    for (auto i : level_inputs) {
-        circ.setAsOutput(i);
+    // apply public permutation
+    for (int i = 0; i < vec_size; ++i){
+        propagate_list[i] = tmp1[i];
+    }
+
+    for (int i = 1; i < vec_size; ++i) {
+        propagate_list[i] = circ.addGate(common::utils::GateType::kAdd, propagate_list[i], propagate_list[i - 1]);
+    }
+
+    for (int i = vec_size - 1; i > 0; --i) {
+        propagate_list[i] = circ.addGate(common::utils::GateType::kSub, propagate_list[i], tmp1[i]);
+    }
+
+
+    for (int i = 0; i < propagate_list.size(); ++i) {
+        circ.setAsOutput(propagate_list[i]);
     }
 
     return circ;
 }
-
 
 void benchmark(const bpo::variables_map& opts) {
 

@@ -1,18 +1,11 @@
 file(REMOVE_RECURSE
   "CMakeFiles/Asterisk.dir/graphsc/offline_evaluator.cpp.o"
-  "CMakeFiles/Asterisk.dir/graphsc/offline_evaluator.cpp.o.d"
   "CMakeFiles/Asterisk.dir/graphsc/online_evaluator_load_balanced.cpp.o"
-  "CMakeFiles/Asterisk.dir/graphsc/online_evaluator_load_balanced.cpp.o.d"
   "CMakeFiles/Asterisk.dir/graphsc/rand_gen_pool.cpp.o"
-  "CMakeFiles/Asterisk.dir/graphsc/rand_gen_pool.cpp.o.d"
   "CMakeFiles/Asterisk.dir/graphsc/sharing.cpp.o"
-  "CMakeFiles/Asterisk.dir/graphsc/sharing.cpp.o.d"
   "CMakeFiles/Asterisk.dir/utils/circuit.cpp.o"
-  "CMakeFiles/Asterisk.dir/utils/circuit.cpp.o.d"
   "CMakeFiles/Asterisk.dir/utils/helpers.cpp.o"
-  "CMakeFiles/Asterisk.dir/utils/helpers.cpp.o.d"
   "CMakeFiles/Asterisk.dir/utils/types.cpp.o"
-  "CMakeFiles/Asterisk.dir/utils/types.cpp.o.d"
   "libAsterisk.a"
   "libAsterisk.pdb"
 )
