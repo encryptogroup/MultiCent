@@ -30,6 +30,7 @@
 #include <emp-tool/emp-tool.h>
 #include "../utils/types.h"
 #include <vector>
+#include "tls_net_io_channel.h"
 
 namespace io {
 using namespace emp;
@@ -37,46 +38,47 @@ using namespace common::utils;
 
 class NetIOMP {
  public:
-  std::vector<std::unique_ptr<NetIO>> ios;
-  std::vector<std::unique_ptr<NetIO>> ios2;
+  std::vector<std::unique_ptr<TLSNetIO>> ios;
+  std::vector<std::unique_ptr<TLSNetIO>> ios2;
   int party;
   int nP;
   std::vector<bool> sent;
 
-  NetIOMP(int party, int nP, int port, char* IP[], bool localhost = false)
+  NetIOMP(int party, int nP, int port, char* IP[], std::string certificate_path, std::string private_key_path,
+          std::string trusted_cert_path, bool localhost)
       : ios(nP), ios2(nP), party(party), nP(nP), sent(nP, false) {
     for (int i = 0; i < nP; ++i) {
       for (int j = i + 1; j < nP; ++j) {
         if (i == party) {
           usleep(1000);
           if (localhost) {
-            ios[j] = std::make_unique<NetIO>("127.0.0.1", port + 2 * (i * nP + j), true);
+            ios[j] = std::make_unique<TLSNetIO>("127.0.0.1", port + 2 * (i * nP + j), trusted_cert_path, true);
           } else {
-            ios[j] = std::make_unique<NetIO>(IP[j], port + 2 * (i * nP +j), true);
+            ios[j] = std::make_unique<TLSNetIO>(IP[j], port + 2 * (i * nP +j), trusted_cert_path, true);
           }
           ios[j]->set_nodelay();
 
           usleep(1000);
           if (localhost) {
-            ios2[j] = std::make_unique<NetIO>(nullptr, port + 2 * (i * nP + j) + 1, true);
+            ios2[j] = std::make_unique<TLSNetIO>(port + 2 * (i * nP + j) + 1, certificate_path, private_key_path, true);
           } else {
-            ios2[j] = std::make_unique<NetIO>(nullptr, port + 2 * (i * nP +j) + 1, true);
+            ios2[j] = std::make_unique<TLSNetIO>(port + 2 * (i * nP +j) + 1, certificate_path, private_key_path, true);
           }
           ios2[j]->set_nodelay();
         } else if (j == party) {
           usleep(1000);
           if (localhost) {
-            ios[i] = std::make_unique<NetIO>(nullptr, port + 2 * (i * nP + j), true);
+            ios[i] = std::make_unique<TLSNetIO>(port + 2 * (i * nP + j), certificate_path, private_key_path, true);
           } else {
-            ios[i] = std::make_unique<NetIO>(nullptr, port + 2 * (i * nP +j), true);
+            ios[i] = std::make_unique<TLSNetIO>(port + 2 * (i * nP +j), certificate_path, private_key_path, true);
           }
           ios[i]->set_nodelay();
 
           usleep(1000);
           if (localhost) {
-            ios2[i] = std::make_unique<NetIO>("127.0.0.1", port + 2 * (i * nP + j) + 1, true);
+            ios2[i] = std::make_unique<TLSNetIO>("127.0.0.1", port + 2 * (i * nP + j) + 1, trusted_cert_path, true);
           } else {
-            ios2[i] = std::make_unique<NetIO>(IP[i], port + 2 * (i * nP +j) + 1, true);
+            ios2[i] = std::make_unique<TLSNetIO>(IP[i], port + 2 * (i * nP +j) + 1, trusted_cert_path, true);
           }
           ios2[i]->set_nodelay();
         }
@@ -136,9 +138,9 @@ class NetIOMP {
   }
 
   void sendBool(int dst, const bool* data, size_t len) {
-    for (int i = 0; i < len;) {
+    for (size_t i = 0; i < len;) {
       uint64_t tmp = 0;
-      for (int j = 0; j < 64 && i < len; ++i, ++j) {
+      for (size_t j = 0; j < 64 && i < len; ++i, ++j) {
         if (data[i]) {
           tmp |= (0x1ULL << j);
         }
@@ -185,7 +187,7 @@ class NetIOMP {
   }
 
   void recvBool(int src, bool* data, size_t len) {
-    for (int i = 0; i < len;) {
+    for (size_t i = 0; i < len;) {
       uint64_t tmp = 0;
       recv(src, &tmp, 8);
       for (int j = 63; j >= 0 && i < len; ++i, --j) {
@@ -203,23 +205,23 @@ class NetIOMP {
     recvBool(src, data, len);
   }
 
-  NetIO* get(size_t idx, bool b = false) {
+  TLSNetIO* get(size_t idx, bool b = false) {
     if (b)
       return ios[idx].get();
     else
       return ios2[idx].get();
   }
 
-  NetIO* getSendChannel(size_t idx) {
-    if (party < idx) {
+  TLSNetIO* getSendChannel(size_t idx) {
+    if ((size_t)party < idx) {
       return ios[idx].get();
     }
 
     return ios2[idx].get();
   }
 
-  NetIO* getRecvChannel(size_t idx) {
-    if (idx < party) {
+  TLSNetIO* getRecvChannel(size_t idx) {
+    if (idx < (size_t)party) {
       return ios[idx].get();
     }
 

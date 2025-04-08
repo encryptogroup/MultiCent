@@ -1,7 +1,15 @@
-# Graphiti
+# MultiCent
 
-This directory contains the implementation of the Graphiti secure graph computation protocol.
+This is an end-to-end implementation of Graphiti with the optimizations from MultiCent, also implementing the new centrality measure protocols
+from MultiCent as well as prior reference ones for comparison purposes.
+
 The protocol is implemented in C++17 and [CMake](https://cmake.org/) is used as the build system.
+It has been tested on Arch Linux (plain and Manjaro Linux) with GCC 14.2.1
+
+This repository is a fork of [Graphiti](https://github.com/Bhavishrg/Graphiti).
+It adds multiple fixes to several issues in the circuit representation, communication channels and protocol implementations.
+Furthermore, it extends the Graphiti codebase to an end-to-end implementation, also utilizing the optimizations provided in our paper.
+Finally, it implements different centrality measure computations.
 
 ## External Dependencies
 The following libraries need to be installed separately and should be available to the build system and compiler.
@@ -10,66 +18,53 @@ The following libraries need to be installed separately and should be available 
 - [NTL](https://www.shoup.net/ntl/) (11.0.0 or later)
 - [Boost](https://www.boost.org/) (1.72.0 or later)
 - [Nlohmann JSON](https://github.com/nlohmann/json)
+- [OpenSSL](https://github.com/openssl/openssl)
 - [EMP Tool](https://github.com/emp-toolkit/emp-tool)
 
-### Docker
-All required dependencies to compile and run the project are available through the docker image.
-To build and run the docker image, execute the following commands from the root directory of the repository:
+All except for EMP Tool should be possible to install from standard repositiories.
+For EMP Tool, follow the instructions from their github page.
 
-```sh
-# Build the EmGraph Docker image.
-#
-# Building the Docker image requires at least 4GB RAM. This needs to be set 
-# explicitly in case of Windows and MacOS.
-docker build -t graphiti .
-
-# Create and run a container.
-#
-# This should start the shell from within the container.
-docker run -it -v $PWD:/code graphiti
-
-# The following command changes the working directory to the one containing the 
-# source code and should be run on the shell started using the previous command.
-cd /code
-```
 
 ## Compilation
-The project uses [CMake](https://cmake.org/) for building the source code. 
 To compile, run the following commands from the root directory of the repository:
 
 ```sh
 mkdir build && cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
 
-make benchmarks
+make -j8 benchmarks
 ```
 
-## Usage
-A short description of the compiled programs is given below.
-All of them provide detailed usage description on using the `--help` option.
+For testing purposes, the build type can be changed to Debug.
 
-- `benchmarks/graphiti_mpa`: Benchmark the performance of the online phases of 1 round of message passing for Graphiti.
-- `benchmarks/graphsc_linear`: Benchmark the performance of the online phases of 1 round of message passing for GraphSC (Linear variant).
-- `benchmarks/graphsc_ro`: Benchmark the performance of the online phases of 1 round of message passing for GraphSC (Round optimised variant).
-- `benchmarks/shuffle`: Benchmark the performance of Graphiti shuffle protocol.
-- `benchmarks/chase_shuffle`: Benchmark the performance of Chase et. al shuffle protocol.
-Execute the following commands from the `build` directory created during compilation to run the programs:
+## Running the Protocols
+All binaries will be written to build/benchmarks.
+Use the ```-h``` flag to show the required CLI arguments.
+
+**Important note**: The naming scheme of used metrics here differs from the paper. pi_3 refers to pi_M, i.e., multilayer Katz; pi_2 refers to pi_K, i.e., truncated Katz; and pi_1 refers to pi_R, i.e., reach score.
+
+Example:
 ```sh
-# Benchmark EmGraph MPA.
-#
-# The command below should be run on n+1 different terminals with $PID set to
-# 0, 1, 2, upto n i.e., one instance corresponding to each party.
-#
-# The -v option can be used to vary the graph size. The -i option can be used to
-# vary the number of iterations for message passing. The -l option will later on
-# allow to vary the network latency.
-#
-# The program can be run on different machines by replacing the `--localhost`
-# option with '--net-config <net_config.json>' where 'net_config.json' is a
-# JSON file containing the IPs of the parties. A template is given in the
-# repository root.
-./benchmarks/graphiti_mpa -p $party --localhost -v $vec_size
-
-# Run the graph_analysis script to automatically run the benchmarks
-./../graph_analysis.sh
+./pi_3_benchmark --localhost --depth 2 --nodes 10 --size 20 --pid [PID]
 ```
+will start a benchmark for pi_3^D with all servers on the same machine, with D=2, 10 nodes, size 20 (nodes + edges, i.e., 10 directed edges in addition
+to the nodes) and for PID which has to be 0 for the helper, 1 for one server and 2 for the other, all of which need to be started on their own.
+
+## Structure
+
+The benchmarks include the following targets:
+* pi_3, pi_2, pi_1 are the different centrality measures
+* the _ref version corresponds to the prior WWW'17 protocol which we implemented in our setting for a fair comparison
+* the _test prefix corresponds to a test instance where the correctness of the output and the communication is checked
+* the _benchmark prefix corresponds to a benchmark instance for variable sized graphs, where only the communication is checked
+* there also are additional tests test, shuffle, doubleshuffle, compaction, sort, equalszero to test some of the used primitives standalone
+
+In addition, we provide the following scripts:
+* run_LAN_benchmarks.sh was used by us to run all benchmarks featured in the paper for the LAN setting (the network setting has to be configures separately)
+* run_WAN_benchmarks.sh is the same for the WAN setting (the network setting has to be configures separately)
+* run_test takes as arguments the PID and then some instance and was just used for quick testing of the different protoocols when built in Debug mode.
+
+The implementation of our protocols can be found in the following places:
+* the benchmark directory contains examples in the tests and benchmarks of how our protocols can be instantiated and used
+* the same directory also contains subcircuits.cpp/subcircuits.h. These contain generators for the subcircuits used for message-passing, sorting, etc.; hence they are of central relevance for all implemented protocols
+* in addition, the protocols rely on low-level primitives such as shuffling, multiplying, ... These can be found mainly in src/graphsc in online_evaluator_load_balanced.cpp and offline_evaluator.cpp that define the exact behaviour of these low-level gates.

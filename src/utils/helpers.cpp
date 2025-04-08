@@ -91,7 +91,7 @@ void randomizeZZpE(emp::PRG& prg, NTL::ZZ_pE& val, Ring rval) {
   NTL::conv(val, temp);
 }
 
-void receiveZZpE(emp::NetIO* ios, NTL::ZZ_pE* data, size_t length) {
+void receiveZZpE(emp::TLSNetIO* ios, NTL::ZZ_pE* data, size_t length) {
   auto degree = NTL::ZZ_pE::degree();
   // Assumes that every co-efficient of ZZ_pE is same range as Ring.
   std::vector<uint8_t> serialized(sizeof(Ring));
@@ -109,7 +109,7 @@ void receiveZZpE(emp::NetIO* ios, NTL::ZZ_pE* data, size_t length) {
   }
 }
 
-void sendZZpE(emp::NetIO* ios, const NTL::ZZ_pE* data, size_t length) {
+void sendZZpE(emp::TLSNetIO* ios, const NTL::ZZ_pE* data, size_t length) {
   auto degree = NTL::ZZ_pE::degree();
   // Assumes that every co-efficient of ZZ_pE is same range as Ring.
   std::vector<uint8_t> serialized(sizeof(Ring));

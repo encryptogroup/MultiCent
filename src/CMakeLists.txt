@@ -1,4 +1,4 @@
-add_library(Asterisk
+add_library(MultiCent
     utils/circuit.cpp
     utils/types.cpp
     utils/helpers.cpp
@@ -9,5 +9,5 @@ add_library(Asterisk
 
 
 
-target_include_directories(Asterisk PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(Asterisk PUBLIC Boost::system EMPTool NTL GMP)
+target_include_directories(MultiCent PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(MultiCent PUBLIC Boost::system EMPTool NTL GMP)

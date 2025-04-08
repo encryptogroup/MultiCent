@@ -8,63 +8,52 @@
 #include <cmath>
 #include <iostream>
 #include <memory>
+#include <cmath>
 
 #include "utils.h"
 #include "benchmark.h"
+#include "subcircuits.h"
 
 using namespace graphsc;
 using json = nlohmann::json;
 namespace bpo = boost::program_options;
 
-
-std::tuple<common::utils::LevelOrderedCircuit, std::vector<std::vector<common::utils::wire_t>>> generateCircuit(size_t n) {
+std::tuple<common::utils::LevelOrderedCircuit, std::vector<std::vector<std::vector<common::utils::wire_t>>>> generateCircuit(size_t n, size_t l, size_t depth) {
     
     common::utils::Circuit<Ring> circ;
 
-    /*
-    Circuit idea:
-    Input vectors x, y, z of equal size n
-    Compute pi^(-1)(pi(x)), rho(y), rho(z) for random permutations pi, rho.
+    // This inherits the communication from subcirc::pi_3_ref + 4n bytes online and 1 round for the output layer
+    // 4n^3*(D-1)+24n^2 bytes setup
+    // 8n^3*(D-1)+48n^2 bytes online
+    // D + 5 rounds
 
-    Communication:
-    Setup: P0 sends 8n bytes to set up 2 permutations and 32n bytes for the masks
-    Online: P1/P2 each send 16n bytes + 12n to reveal outputs => 28n
-    3 rounds including output stage
-    */
+    std::vector<std::vector<std::vector<common::utils::wire_t>>> adj_matrices(l);
 
-    std::vector<std::vector<common::utils::wire_t>> input_vectors;
-    input_vectors.push_back(std::vector<common::utils::wire_t>(n));
-    std::generate(input_vectors[0].begin(), input_vectors[0].end(),
-                [&]() { return circ.newInputWire(); });
-    input_vectors.push_back(std::vector<common::utils::wire_t>(n));
-    std::generate(input_vectors[1].begin(), input_vectors[1].end(),
-                [&]() { return circ.newInputWire(); });
-    input_vectors.push_back(std::vector<common::utils::wire_t>(n));
-    std::generate(input_vectors[2].begin(), input_vectors[2].end(),
-                [&]() { return circ.newInputWire(); });
-
-    auto pi_x = circ.addParamWithOptMGate(common::utils::GateType::kShuffle, input_vectors[0], 0);
-    auto outputs_x = circ.addParamWithOptMGate(common::utils::GateType::kShuffle, pi_x, 0, true);
-    auto outputs_y = circ.addParamWithOptMGate(common::utils::GateType::kShuffle, input_vectors[1], 1);
-    auto outputs_z = circ.addParamWithOptMGate(common::utils::GateType::kShuffle, input_vectors[2], 1);
-
-    for (auto i : outputs_x) {
-        circ.setAsOutput(i);
+    for (size_t k = 0; k < l; k++) {
+        for (size_t i = 0; i < n; i++) {
+            adj_matrices[k].push_back(std::vector<common::utils::wire_t>());
+            for (size_t j = 0; j < n; j++) {
+                adj_matrices[k][i].push_back(circ.newInputWire());
+            }
+        }
     }
-    for (auto i : outputs_y) {
-        circ.setAsOutput(i);
+
+    auto output_vector = subcirc::pi_1_reference(adj_matrices, circ, n, depth);
+
+    for (auto out : output_vector) {
+        circ.setAsOutput(out);
     }
-    for (auto i : outputs_z) {
-        circ.setAsOutput(i);
-    }
-    
-    return {circ.orderGatesByLevel(), input_vectors};
+
+    return {circ.orderGatesByLevel(), adj_matrices};
 }
-
 
 void benchmark(const bpo::variables_map& opts) {
 
-    auto vec_size = opts["vec-size"].as<size_t>();
+    auto n = opts["nodes"].as<size_t>();
+    auto l = opts["layers"].as<size_t>();
+    auto depth = opts["depth"].as<size_t>();
+    if (depth == 0)
+        throw std::runtime_error("D=0 (depth zero) not allowed for reference implementations");
     
     size_t pid, repeat, threads;
     std::shared_ptr<io::NetIOMP> network = nullptr;
@@ -79,7 +68,9 @@ void benchmark(const bpo::variables_map& opts) {
                                 {"seeds_h", seeds_h},
                                 {"seeds_l", seeds_l},
                                 {"repeat", repeat},
-                                {"vec-size", vec_size}};
+                                {"nodes", n},
+                                {"layers", l},
+                                {"D", depth}};
     output_data["benchmarks_pre"] = json::array();
     output_data["benchmarks"] = json::array();
 
@@ -89,31 +80,32 @@ void benchmark(const bpo::variables_map& opts) {
     }
     std::cout << std::endl;
 
-    auto [circ, input_vectors] = generateCircuit(vec_size);
+    /*
+    Graph instance:
+    Just generate l many nxn zero matrices as the protocol is oblivious regarding the matrix content.
+    */
+
+    auto [circ, adj_matrices] = generateCircuit(n, l, depth);
     std::cout << "--- Circuit ---\n";
     std::cout << circ << std::endl;
 
     std::unordered_map<common::utils::wire_t, Ring> input_to_val;
     std::unordered_map<common::utils::wire_t, int> input_to_pid;
-    assert(input_vectors.size() == 3);
-    for (size_t i = 0; i < 3; i++)
-        assert(input_vectors[i].size() == vec_size);
-    // Set first vector to 0,1,...
-    for (size_t i = 0; i < vec_size; i++)
-        input_to_val[input_vectors[0][i]] = i;
-    // Set second vector to 0,1,...
-    for (size_t i = 0; i < vec_size; i++)
-        input_to_val[input_vectors[1][i]] = i;
-    // Set third vector to 0,2,4,6,...
-    for (size_t i = 0; i < vec_size; i++)
-        input_to_val[input_vectors[2][i]] = i << 1;
 
-    for (size_t i = 0; i < 3; i++) {
-        for (auto in: input_vectors[i]) {
-            input_to_pid[in] = 2;
-        }
+    assert(adj_matrices.size() == l);
+    for (size_t i = 0; i < l; i++) {
+        assert(adj_matrices[i].size() == n);
+        assert(adj_matrices[i][0].size() == n);
     }
 
+    for (size_t k = 0; k < l; k++) 
+        for (size_t i = 0; i < n; i++)
+            for (size_t j = 0; j < n; j++) {
+                input_to_val[adj_matrices[k][i][j]] = 0;
+                input_to_pid[adj_matrices[k][i][j]] = 2;
+            }
+    
+    network->sync();
     for (size_t r = 0; r < repeat; ++r) {
         std::cout << "--- Repetition " << r + 1 << " ---" << std::endl;
 
@@ -146,32 +138,20 @@ void benchmark(const bpo::variables_map& opts) {
         }
 
         if (pid != 0) {
-            // First vec_size elements should be 0,1,...
-            for (size_t i = 0; i < vec_size; i++)
-                assert(res[i] == i);
-            // Second vector should not be in original order
-            // This could fail if you are really unlucky or the vector is too small
-            bool different = false;
-            for (size_t i = 0; i < vec_size; i++)
-                different = different || (res[vec_size + i] != i);
-            assert(different);
-            // Third vector should be second * 2 as it is shuffled the same way
-            for (size_t i = 0; i < vec_size; i++)
-                assert(res[2 * vec_size + i] == 2 * res[vec_size + i]);
-
-            assert(bytes_sent == 28 * vec_size);
+            assert(bytes_sent == 8*n*n*n*(depth-1) + 48*n*n + 4*n);
             assert(bytes_sent_pre == 0);
         } else {
             assert(bytes_sent == 0);
-            assert(bytes_sent_pre - 56 == 40 * vec_size); // 56 always sent to synchronize vector sizes
+            assert(bytes_sent_pre - 56 == 4*n*n*n*(depth-1) + 24*n*n); // 56 always sent to synchronize vector sizes
         }
-        assert(circ.gates_by_level.size() == 3);
+        assert(circ.gates_by_level.size() == depth + 6);
 
         
         std::cout << "time: " << rbench["time"] << " ms" << std::endl;
         std::cout << "sent: " << bytes_sent << " bytes" << std::endl;
 
         std::cout << std::endl;
+        network->sync();
     }
     output_data["stats"] = {{"peak_virtual_memory", peakVirtualMemory()},
                             {"peak_resident_set_size", peakResidentSetSize()}};
@@ -190,12 +170,14 @@ void benchmark(const bpo::variables_map& opts) {
 int main(int argc, char* argv[]) {
     auto prog_opts(bench::programOptions());
     bpo::options_description cmdline(
-      "Benchmark a simple test for unshuffling and unshuffling");
+      "Benchmark reference pi_1 based on matrix multiplication");
     cmdline.add(prog_opts);
     cmdline.add_options()(
       "config,c", bpo::value<std::string>(),
       "configuration file for easy specification of cmd line arguments")(
-      "help,h", "produce help message") ("vec-size,v", bpo::value<size_t>()->required(), "Number of vector elements.");
+      "help,h", "produce help message")("nodes,n", bpo::value<size_t>()->required(), "Number of nodes/vertices.")
+      ("layers,l", bpo::value<size_t>()->required(), "Number of layers")
+      ("depth,d", bpo::value<size_t>()->required(), "search depth parameter D to pi_3");
 
     bpo::variables_map opts = bench::parseOptions(cmdline, prog_opts, argc, argv);
     if (opts.count("pid") == 0) {

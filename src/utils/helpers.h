@@ -10,6 +10,7 @@
 
 #include "../io/netmp.h"
 #include "types.h"
+#include "../io/tls_net_io_channel.h"
 
 namespace common::utils  {
 int pidFromOffset(int id, int offset);
@@ -41,6 +42,6 @@ void randomizeZZp(emp::PRG& prg, NTL::ZZ_p& val, int nbytes);
 void randomizeZZpE(emp::PRG& prg, NTL::ZZ_pE& val);
 void randomizeZZpE(emp::PRG& prg, NTL::ZZ_pE& val, Ring rval);
 
-void sendZZpE(emp::NetIO* ios, const NTL::ZZ_pE* data, size_t length);
-void receiveZZpE(emp::NetIO* ios, NTL::ZZ_pE* data, size_t length);
+void sendZZpE(emp::TLSNetIO* ios, const NTL::ZZ_pE* data, size_t length);
+void receiveZZpE(emp::TLSNetIO* ios, NTL::ZZ_pE* data, size_t length);
 };  // namespace common::utils 

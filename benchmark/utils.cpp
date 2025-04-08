@@ -14,8 +14,8 @@ double TimePoint::operator-(const TimePoint& rhs) const {
 }
 
 CommPoint::CommPoint(io::NetIOMP& network) : stats(network.nP) {
-  for (size_t i = 0; i < network.nP; ++i) {
-    if (i != network.party) {
+  for (size_t i = 0; i < (size_t)network.nP; ++i) {
+    if (i != (size_t)network.party) {
       stats[i] = network.get(i, false)->counter + network.get(i, true)->counter;
     }
   }

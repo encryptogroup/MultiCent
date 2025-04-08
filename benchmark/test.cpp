@@ -17,55 +17,47 @@ using json = nlohmann::json;
 namespace bpo = boost::program_options;
 
 
-std::tuple<common::utils::LevelOrderedCircuit, std::vector<std::vector<common::utils::wire_t>>> generateCircuit(size_t n) {
-    
+std::tuple<common::utils::LevelOrderedCircuit, std::vector<common::utils::wire_t>> generateCircuit() {
     common::utils::Circuit<Ring> circ;
 
     /*
     Circuit idea:
-    Input vectors x, y, z of equal size n
-    Compute pi^(-1)(pi(x)), rho(y), rho(z) for random permutations pi, rho.
+    Arithmetic inputs a,b,c,d, binary inputs e,f
+    Compute (a * b) * (c + d), e & f, e ^ f, c * (a + b)
 
-    Communication:
-    Setup: P0 sends 8n bytes to set up 2 permutations and 32n bytes for the masks
-    Online: P1/P2 each send 16n bytes + 12n to reveal outputs => 28n
-    3 rounds including output stage
+    This should take 16 bytes sent by P0 and 48 bytes sent by P1 and P2 each in 3 rounds, including the output stage.
     */
 
-    std::vector<std::vector<common::utils::wire_t>> input_vectors;
-    input_vectors.push_back(std::vector<common::utils::wire_t>(n));
-    std::generate(input_vectors[0].begin(), input_vectors[0].end(),
-                [&]() { return circ.newInputWire(); });
-    input_vectors.push_back(std::vector<common::utils::wire_t>(n));
-    std::generate(input_vectors[1].begin(), input_vectors[1].end(),
-                [&]() { return circ.newInputWire(); });
-    input_vectors.push_back(std::vector<common::utils::wire_t>(n));
-    std::generate(input_vectors[2].begin(), input_vectors[2].end(),
-                [&]() { return circ.newInputWire(); });
+    std::vector<common::utils::wire_t> inputs(6);
+    for(size_t i = 0; i < 4; i++) {
+        inputs[i] = circ.newInputWire();
+    }
+    for(size_t i = 4; i < 6; i++) {
+        inputs[i] = circ.newBinInputWire();
+    }
 
-    auto pi_x = circ.addParamWithOptMGate(common::utils::GateType::kShuffle, input_vectors[0], 0);
-    auto outputs_x = circ.addParamWithOptMGate(common::utils::GateType::kShuffle, pi_x, 0, true);
-    auto outputs_y = circ.addParamWithOptMGate(common::utils::GateType::kShuffle, input_vectors[1], 1);
-    auto outputs_z = circ.addParamWithOptMGate(common::utils::GateType::kShuffle, input_vectors[2], 1);
+    std::vector<common::utils::wire_t> intermediate(3);
+    intermediate[0] = circ.addGate(common::utils::GateType::kMul, inputs[0], inputs[1]);
+    intermediate[1] = circ.addGate(common::utils::GateType::kAdd, inputs[2], inputs[3]);
+    intermediate[2] = circ.addGate(common::utils::GateType::kAdd, inputs[0], inputs[1]);
 
-    for (auto i : outputs_x) {
-        circ.setAsOutput(i);
-    }
-    for (auto i : outputs_y) {
-        circ.setAsOutput(i);
-    }
-    for (auto i : outputs_z) {
-        circ.setAsOutput(i);
-    }
-    
-    return {circ.orderGatesByLevel(), input_vectors};
+    std::vector<common::utils::wire_t> outputs(4);
+    outputs[0] = circ.addGate(common::utils::GateType::kMul, intermediate[0], intermediate[1]);
+    outputs[1] = circ.addGate(common::utils::GateType::kAnd, inputs[4], inputs[5]);
+    outputs[2] = circ.addGate(common::utils::GateType::kXor, inputs[4], inputs[5]);
+    outputs[3] = circ.addGate(common::utils::GateType::kMul, inputs[2], intermediate[2]);
+
+
+    circ.setAsOutput(outputs[0]);
+    circ.setAsBinOutput(outputs[1]);
+    circ.setAsBinOutput(outputs[2]);
+    circ.setAsOutput(outputs[3]);
+
+    return {circ.orderGatesByLevel(), inputs};
 }
 
 
 void benchmark(const bpo::variables_map& opts) {
-
-    auto vec_size = opts["vec-size"].as<size_t>();
-    
     size_t pid, repeat, threads;
     std::shared_ptr<io::NetIOMP> network = nullptr;
     uint64_t seeds_h[5];
@@ -78,8 +70,7 @@ void benchmark(const bpo::variables_map& opts) {
                                 {"threads", threads},
                                 {"seeds_h", seeds_h},
                                 {"seeds_l", seeds_l},
-                                {"repeat", repeat},
-                                {"vec-size", vec_size}};
+                                {"repeat", repeat}};
     output_data["benchmarks_pre"] = json::array();
     output_data["benchmarks"] = json::array();
 
@@ -89,30 +80,23 @@ void benchmark(const bpo::variables_map& opts) {
     }
     std::cout << std::endl;
 
-    auto [circ, input_vectors] = generateCircuit(vec_size);
+    auto [circ, inputs] = generateCircuit();
     std::cout << "--- Circuit ---\n";
     std::cout << circ << std::endl;
 
     std::unordered_map<common::utils::wire_t, Ring> input_to_val;
     std::unordered_map<common::utils::wire_t, int> input_to_pid;
-    assert(input_vectors.size() == 3);
-    for (size_t i = 0; i < 3; i++)
-        assert(input_vectors[i].size() == vec_size);
-    // Set first vector to 0,1,...
-    for (size_t i = 0; i < vec_size; i++)
-        input_to_val[input_vectors[0][i]] = i;
-    // Set second vector to 0,1,...
-    for (size_t i = 0; i < vec_size; i++)
-        input_to_val[input_vectors[1][i]] = i;
-    // Set third vector to 0,2,4,6,...
-    for (size_t i = 0; i < vec_size; i++)
-        input_to_val[input_vectors[2][i]] = i << 1;
-
-    for (size_t i = 0; i < 3; i++) {
-        for (auto in: input_vectors[i]) {
-            input_to_pid[in] = 2;
-        }
+    assert(inputs.size() == 6);
+    input_to_val[inputs[0]] = 5;
+    input_to_val[inputs[1]] = 3;
+    input_to_val[inputs[2]] = 8;
+    input_to_val[inputs[3]] = 11;
+    input_to_val[inputs[4]] = 0x00FF00F1;
+    input_to_val[inputs[5]] = 0xFF1F0010;
+    for (auto in: inputs) {
+        input_to_pid[in] = 2;
     }
+    
 
     for (size_t r = 0; r < repeat; ++r) {
         std::cout << "--- Repetition " << r + 1 << " ---" << std::endl;
@@ -146,24 +130,16 @@ void benchmark(const bpo::variables_map& opts) {
         }
 
         if (pid != 0) {
-            // First vec_size elements should be 0,1,...
-            for (size_t i = 0; i < vec_size; i++)
-                assert(res[i] == i);
-            // Second vector should not be in original order
-            // This could fail if you are really unlucky or the vector is too small
-            bool different = false;
-            for (size_t i = 0; i < vec_size; i++)
-                different = different || (res[vec_size + i] != i);
-            assert(different);
-            // Third vector should be second * 2 as it is shuffled the same way
-            for (size_t i = 0; i < vec_size; i++)
-                assert(res[2 * vec_size + i] == 2 * res[vec_size + i]);
+            assert(res[0] == 285); // (5 * 3) * (8 + 11)
+            assert(res[1] == 0x001F0010); // 0x00FF00F1 & 0xFF1F0010
+            assert(res[2] == 0xFFE000E1); // 0x00FF00F1 ^ 0xFF1F0010
+            assert(res[3] == 64); // 8 * (5 + 3)
 
-            assert(bytes_sent == 28 * vec_size);
+            assert(bytes_sent == 48);
             assert(bytes_sent_pre == 0);
         } else {
             assert(bytes_sent == 0);
-            assert(bytes_sent_pre - 56 == 40 * vec_size); // 56 always sent to synchronize vector sizes
+            assert(bytes_sent_pre - 56 == 16); // 56 always sent to synchronize vector sizes
         }
         assert(circ.gates_by_level.size() == 3);
 
@@ -190,12 +166,12 @@ void benchmark(const bpo::variables_map& opts) {
 int main(int argc, char* argv[]) {
     auto prog_opts(bench::programOptions());
     bpo::options_description cmdline(
-      "Benchmark a simple test for unshuffling and unshuffling");
+      "Benchmark a simple test featuring a circuit that uses some simple primitive gates");
     cmdline.add(prog_opts);
     cmdline.add_options()(
       "config,c", bpo::value<std::string>(),
       "configuration file for easy specification of cmd line arguments")(
-      "help,h", "produce help message") ("vec-size,v", bpo::value<size_t>()->required(), "Number of vector elements.");
+      "help,h", "produce help message");
 
     bpo::variables_map opts = bench::parseOptions(cmdline, prog_opts, argc, argv);
     if (opts.count("pid") == 0) {

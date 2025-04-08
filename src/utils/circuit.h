@@ -19,15 +19,20 @@ namespace common::utils {
 
 using wire_t = size_t;
 
+const bool DEPTH_ASSIGN_VERBOSE = false;
+
 enum GateType {
   kInp,
+  kBinInp,
   kAdd,
+  kCompose,
   kMul,
   kMul3,
   kMul4,
   kSub,
   kConstAdd,
   kConstMul,
+  kFlip,
   kRelu,
   kMsb,
   kEqz,
@@ -35,7 +40,25 @@ enum GateType {
   kDotprod,
   kTrdotp,
   kShuffle,
+  kDoubleShuffle, // Concatenation of two shuffles
+  kGenCompaction, // https://eprint.iacr.org/2022/1595.pdf
   kInvalid,
+  kAnd,
+  kXor,
+  kReveal, // Write clear value into both shares
+  kReorder, // Reorders according to second half of inputs in clear
+  kReorderInverse, // Reorders according to second half of inputs in clear
+  kAddConstToVec,
+  kPreparePropagate,
+  kPropagate,
+  kPrepareGather,
+  kGather,
+  // one tree layer of arithmetic equals zero check
+  // last layer outputs 1 if true, else 0
+  // parameter decides depth, 0 if first layer of ORs, 4 if last layer
+  kEqualsZero,
+  kConvertB2A, // convert Boolean share to arithmetic
+  kAddVec,
   NumGates
 };
 
@@ -47,10 +70,11 @@ struct Gate {
   GateType type{GateType::kInvalid};
   wire_t out;
   std::vector<wire_t> outs;
+  size_t gid;
 
   Gate() = default;
-  Gate(GateType type, wire_t out);
-  Gate(GateType type, wire_t out, std::vector<wire_t> outs);
+  Gate(GateType type, wire_t out, size_t gid);
+  Gate(GateType type, wire_t out, std::vector<wire_t> outs, size_t gid);
 
   virtual ~Gate() = default;
 };
@@ -61,7 +85,7 @@ struct FIn2Gate : public Gate {
   wire_t in2{0};
 
   FIn2Gate() = default;
-  FIn2Gate(GateType type, wire_t in1, wire_t in2, wire_t out);
+  FIn2Gate(GateType type, wire_t in1, wire_t in2, wire_t out, size_t gid);
 };
 
 struct FIn3Gate : public Gate {
@@ -70,7 +94,7 @@ struct FIn3Gate : public Gate {
   wire_t in3{0};
 
   FIn3Gate() = default;
-  FIn3Gate(GateType type, wire_t in1, wire_t in2, wire_t in3, wire_t out);
+  FIn3Gate(GateType type, wire_t in1, wire_t in2, wire_t in3, wire_t out, size_t gid);
 };
 
 struct FIn4Gate : public Gate {
@@ -81,7 +105,7 @@ struct FIn4Gate : public Gate {
 
   FIn4Gate() = default;
   FIn4Gate(GateType type, wire_t in1, wire_t in2, 
-            wire_t in3, wire_t in4, wire_t out);
+            wire_t in3, wire_t in4, wire_t out, size_t gid);
 };
 
 // Represents a gate with fan-in 1.
@@ -89,7 +113,16 @@ struct FIn1Gate : public Gate {
   wire_t in{0};
 
   FIn1Gate() = default;
-  FIn1Gate(GateType type, wire_t in, wire_t out);
+  FIn1Gate(GateType type, wire_t in, wire_t out, size_t gid);
+};
+
+// Represents a parametrized gate with fan-in 1.
+struct ParamFIn1Gate : public Gate {
+  wire_t in{0};
+  size_t param;
+
+  ParamFIn1Gate() = default;
+  ParamFIn1Gate(GateType type, wire_t in, wire_t out, size_t param, size_t gid);
 };
 
 // Represents a gate used to denote SIMD operations.
@@ -101,7 +134,18 @@ struct SIMDGate : public Gate {
 
   SIMDGate() = default;
   SIMDGate(GateType type, std::vector<wire_t> in1, std::vector<wire_t> in2,
-           wire_t out);
+           wire_t out, size_t gid);
+};
+
+// Represents a gate used to denote SIMD operations.
+// These type is used to represent operations that take vectors of inputs and give vector of output but
+// might not necessarily be SIMD e.g., shuffle.
+struct SIMDSingleOutGate : public Gate {
+  std::vector<wire_t> in1{0};
+
+  SIMDSingleOutGate() = default;
+  SIMDSingleOutGate(GateType type, std::vector<wire_t> in1,
+           wire_t out, size_t gid);
 };
 
 // Represents a gate used to denote SIMD operations.
@@ -112,7 +156,68 @@ struct SIMDOGate : public Gate {
 
   SIMDOGate() = default;
   SIMDOGate(GateType type, std::vector<wire_t> in1,
-           std::vector<wire_t> out);
+           std::vector<wire_t> out, size_t gid);
+};
+
+// Represents a gate used to denote SIMD operations.
+// These type is used to represent operations that take vectors of inputs and give vector of output but
+// might not necessarily be SIMD e.g., shuffle.
+struct SIMDODoubleInGate : public Gate {
+  std::vector<wire_t> in1{0}, in2{0};
+
+  SIMDODoubleInGate() = default;
+  SIMDODoubleInGate(GateType type, std::vector<wire_t> in1, std::vector<wire_t> in2,
+           std::vector<wire_t> out, size_t gid);
+};
+
+// Represents a parametrized gate used to denote SIMD operations.
+// These type is used to represent operations that take vectors of inputs and give vector of output but
+// might not necessarily be SIMD e.g., shuffle.
+struct ParamSIMDOGate : public Gate {
+  std::vector<wire_t> in1{0};
+  size_t param;
+
+  ParamSIMDOGate() = default;
+  ParamSIMDOGate(GateType type, std::vector<wire_t> in1,
+           std::vector<wire_t> out, size_t param, size_t gid);
+};
+
+// Represents a parametrized gate used to denote SIMD operations.
+// These type is used to represent operations that take vectors of inputs and give vector of output but
+// might not necessarily be SIMD e.g., shuffle.
+struct TwoParamSIMDOGate : public Gate {
+  std::vector<wire_t> in1{0};
+  size_t param1, param2;
+
+  TwoParamSIMDOGate() = default;
+  TwoParamSIMDOGate(GateType type, std::vector<wire_t> in1,
+           std::vector<wire_t> out, size_t param1, size_t param2, size_t gid);
+};
+
+// Represents a parametrized gate used to denote SIMD operations.
+// These type is used to represent operations that take vectors of inputs and give vector of output but
+// might not necessarily be SIMD e.g., shuffle.
+struct ThreeParamSIMDOGate : public Gate {
+  std::vector<wire_t> in1{0};
+  size_t param1, param2, param3;
+
+  ThreeParamSIMDOGate() = default;
+  ThreeParamSIMDOGate(GateType type, std::vector<wire_t> in1,
+           std::vector<wire_t> out, size_t param1, size_t param2, size_t param3, size_t gid);
+};
+
+// Represents a parametrized gate used to denote SIMD operations.
+// This version also accepts a second parameter which is a boolean flag.
+// These type is used to represent operations that take vectors of inputs and give vector of output but
+// might not necessarily be SIMD e.g., shuffle.
+struct ParamWithFlagSIMDOGate : public Gate {
+  std::vector<wire_t> in1{0};
+  size_t param;
+  bool flag;
+
+  ParamWithFlagSIMDOGate() = default;
+  ParamWithFlagSIMDOGate(GateType type, std::vector<wire_t> in1,
+           std::vector<wire_t> out, size_t param, bool flag, size_t gid);
 };
 
 // Represents gates where one input is a constant.
@@ -122,8 +227,8 @@ struct ConstOpGate : public Gate {
   R cval;
 
   ConstOpGate() = default;
-  ConstOpGate(GateType type, wire_t in, R cval, wire_t out)
-      : Gate(type, out), in(in), cval(std::move(cval)) {}
+  ConstOpGate(GateType type, wire_t in, R cval, wire_t out, size_t gid)
+      : Gate(type, out, gid), in(in), cval(std::move(cval)) {}
 };
 
 using gate_ptr_t = std::shared_ptr<Gate>;
@@ -137,7 +242,7 @@ struct LevelOrderedCircuit {
   size_t num_gates;
   size_t num_wires;
   std::array<uint64_t, GateType::NumGates> count;
-  std::vector<wire_t> outputs;
+  std::vector<wire_t> outputs, output_bin;
   std::vector<std::vector<gate_ptr_t>> gates_by_level;
 
   friend std::ostream& operator<<(std::ostream& os,
@@ -147,9 +252,9 @@ struct LevelOrderedCircuit {
 // Represents an arithmetic circuit.
 template <class R>
 class Circuit {
-  std::vector<wire_t> outputs_;
+  std::vector<wire_t> outputs_, output_bin_;
   std::vector<gate_ptr_t> gates_;
-  size_t num_wires;
+  size_t num_wires = 0;
 
   bool isWireValid(wire_t wid) { return wid < num_wires; }
   // bool isWireValid(wire_t wid) { return 1; }
@@ -159,8 +264,16 @@ class Circuit {
 
   // Methods to manually build a circuit.
   wire_t newInputWire() {
-    wire_t wid = gates_.size();
-    gates_.push_back(std::make_shared<Gate>(GateType::kInp, wid));
+    wire_t wid = num_wires;
+    gates_.push_back(std::make_shared<Gate>(GateType::kInp, wid, gates_.size()));
+    num_wires += 1; 
+    return wid;
+  }
+
+  // Methods to manually build a circuit.
+  wire_t newBinInputWire() {
+    wire_t wid = num_wires;
+    gates_.push_back(std::make_shared<Gate>(GateType::kBinInp, wid, gates_.size()));
     num_wires += 1; 
     return wid;
   }
@@ -171,12 +284,23 @@ class Circuit {
     }
 
     outputs_.push_back(wid);
+    output_bin_.push_back(false);
+  }
+
+    void setAsBinOutput(wire_t wid) {
+    if (!isWireValid(wid)) {
+      throw std::invalid_argument("Invalid wire ID. for out");
+    }
+
+    outputs_.push_back(wid);
+    output_bin_.push_back(true);
   }
 
   // Function to add a gate with fan-in 2.
   wire_t addGate(GateType type, wire_t input1, wire_t input2) {
     if (type != GateType::kAdd && type != GateType::kMul &&
-        type != GateType::kSub) {
+        type != GateType::kSub && type != GateType::kAnd &&
+        type != GateType::kXor) {
       throw std::invalid_argument("Invalid gate type.");
     }
 
@@ -184,8 +308,8 @@ class Circuit {
       throw std::invalid_argument("Invalid wire ID.");
     }
 
-    wire_t output = gates_.size();
-    gates_.push_back(std::make_shared<FIn2Gate>(type, input1, input2, output));
+    wire_t output = num_wires;
+    gates_.push_back(std::make_shared<FIn2Gate>(type, input1, input2, output, gates_.size()));
     num_wires += 1;
 
     return output;
@@ -201,8 +325,8 @@ class Circuit {
       throw std::invalid_argument("Invalid wire ID.");
     }
 
-    wire_t output = gates_.size();
-    gates_.push_back(std::make_shared<FIn3Gate>(type, input1, input2, input3, output));
+    wire_t output = num_wires;
+    gates_.push_back(std::make_shared<FIn3Gate>(type, input1, input2, input3, output, gates_.size()));
     num_wires += 1;
 
     return output;
@@ -220,9 +344,9 @@ class Circuit {
       throw std::invalid_argument("Invalid wire ID.");
     }
 
-    wire_t output = gates_.size();
+    wire_t output = num_wires;
     gates_.push_back(std::make_shared<FIn4Gate>(type, input1, input2, 
-                                          input3, input4, output));
+                                          input3, input4, output, gates_.size()));
     num_wires += 1;
 
     return output;
@@ -239,8 +363,8 @@ class Circuit {
       throw std::invalid_argument("Invalid wire ID.");
     }
 
-    wire_t output = gates_.size();
-    gates_.push_back(std::make_shared<ConstOpGate<R>>(type, wid, cval, output));
+    wire_t output = num_wires;
+    gates_.push_back(std::make_shared<ConstOpGate<R>>(type, wid, cval, output, gates_.size()));
     num_wires += 1;
 
     return output;
@@ -249,7 +373,8 @@ class Circuit {
   // Function to add a single input gate.
   wire_t addGate(GateType type, wire_t input) {
     if (type != GateType::kRelu && type != GateType::kMsb
-        && type != GateType::kEqz && type != GateType::kLtz) {
+        && type != GateType::kEqz && type != GateType::kLtz
+        && type != GateType::kConvertB2A) {
       throw std::invalid_argument("Invalid gate type.");
     }
 
@@ -257,8 +382,8 @@ class Circuit {
       throw std::invalid_argument("Invalid wire ID.");
     }
 
-    wire_t output = gates_.size();
-    gates_.push_back(std::make_shared<FIn1Gate>(type, input, output));
+    wire_t output = num_wires;
+    gates_.push_back(std::make_shared<FIn1Gate>(type, input, output, gates_.size()));
     num_wires += 1;
 
     return output;
@@ -281,15 +406,140 @@ class Circuit {
       }
     }
 
-    wire_t output = gates_.size();
-    gates_.push_back(std::make_shared<SIMDGate>(type, input1, input2, output));
+    wire_t output = num_wires;
+    gates_.push_back(std::make_shared<SIMDGate>(type, input1, input2, output, gates_.size()));
     num_wires += 1;
 
     return output;
   }
 
-  // Function to add a multiple in + out gate.
+  // Function to add a multiple in + out gate. assumes #in = #out
   std::vector<wire_t> addMGate(GateType type, const std::vector<wire_t>& input1) {
+    if (type != GateType::kGenCompaction && type != GateType::kReveal && type != GateType::kFlip && type != GateType::kPrepareGather) {
+      throw std::invalid_argument("Invalid gate type.");
+    }
+
+    for (size_t i = 0; i < input1.size(); i++) {
+      if (!isWireValid(input1[i])) {
+        throw std::invalid_argument("Invalid wire ID. for shuf");
+      }
+    }
+
+    std::vector<wire_t> output(input1.size());
+    for(size_t i=0; i< input1.size(); i++){
+      output[i] = i + num_wires;
+    }
+    gates_.push_back(std::make_shared<SIMDOGate>(type, input1, output, gates_.size()));
+    num_wires += input1.size();
+    return output;
+  }
+
+  // Function to add a multiple in + 1 out gate.
+  wire_t addMSingleOutGate(GateType type, const std::vector<wire_t>& input1) {
+    if (type != GateType::kCompose) {
+      throw std::invalid_argument("Invalid gate type.");
+    }
+
+    for (size_t i = 0; i < input1.size(); i++) {
+      if (!isWireValid(input1[i])) {
+        throw std::invalid_argument("Invalid wire ID. for shuf");
+      }
+    }
+
+    wire_t output = num_wires;
+    gates_.push_back(std::make_shared<SIMDSingleOutGate>(type, input1, output, gates_.size()));
+    num_wires++;
+    return output;
+  }
+
+  // Function to add a multiple in + out gate where there are 2 in vectors,
+  // each of the same dimension as the out vector
+  std::vector<wire_t> addMDoubleInGate(GateType type, const std::vector<wire_t>& input1, const std::vector<wire_t>& input2) {
+    if (type != GateType::kReorder && type != GateType::kReorderInverse && type != GateType::kPropagate && type != GateType::kAddVec) {
+      throw std::invalid_argument("Invalid gate type.");
+    }
+
+    for (size_t i = 0; i < input1.size(); i++) {
+      if (!isWireValid(input1[i]) || !isWireValid(input2[i])) {
+        throw std::invalid_argument("Invalid wire ID. for shuf");
+      }
+    }
+
+    std::vector<wire_t> output(input1.size());
+    for(size_t i=0; i< input1.size(); i++){
+      output[i] = i + num_wires;
+    }
+    gates_.push_back(std::make_shared<SIMDODoubleInGate>(type, input1, input2, output, gates_.size()));
+    num_wires += input1.size();
+    return output;
+  }
+
+  // Function to add a parametrized multiple in + out gate with. assumes #in = #out
+  std::vector<wire_t> addParamMGate(GateType type, const std::vector<wire_t>& input1, size_t param) {
+    if (type != GateType::kPreparePropagate && type != GateType::kGather) {
+      throw std::invalid_argument("Invalid gate type.");
+    }
+
+    for (size_t i = 0; i < input1.size(); i++) {
+      if (!isWireValid(input1[i])) {
+        throw std::invalid_argument("Invalid wire ID. for shuf");
+      }
+    }
+
+    std::vector<wire_t> output(input1.size());
+    for(size_t i=0; i< input1.size(); i++){
+      output[i] = i + num_wires;
+    }
+    gates_.push_back(std::make_shared<ParamSIMDOGate>(type, input1, output, param, gates_.size()));
+    num_wires += input1.size();
+    return output;
+  }
+
+    // Function to add a parametrized multiple in + out gate with. assumes #in = #out
+  std::vector<wire_t> addTwoParamMGate(GateType type, const std::vector<wire_t>& input1, size_t param1, size_t param2) {
+    if (type != GateType::kAddConstToVec) {
+      throw std::invalid_argument("Invalid gate type.");
+    }
+
+    for (size_t i = 0; i < input1.size(); i++) {
+      if (!isWireValid(input1[i])) {
+        throw std::invalid_argument("Invalid wire ID. for shuf");
+      }
+    }
+
+    std::vector<wire_t> output(input1.size());
+    for(size_t i=0; i< input1.size(); i++){
+      output[i] = i + num_wires;
+    }
+    gates_.push_back(std::make_shared<TwoParamSIMDOGate>(type, input1, output, param1, param2, gates_.size()));
+    num_wires += input1.size();
+    return output;
+  }
+
+  // Function to add a parametrized multiple in + out gate with. assumes #in = #out
+  std::vector<wire_t> addThreeParamMGate(GateType type, const std::vector<wire_t>& input1, size_t param1, size_t param2, size_t param3) {
+    if (type != GateType::kDoubleShuffle) {
+      throw std::invalid_argument("Invalid gate type.");
+    }
+
+    for (size_t i = 0; i < input1.size(); i++) {
+      if (!isWireValid(input1[i])) {
+        throw std::invalid_argument("Invalid wire ID. for shuf");
+      }
+    }
+
+    std::vector<wire_t> output(input1.size());
+    for(size_t i=0; i< input1.size(); i++){
+      output[i] = i + num_wires;
+    }
+    gates_.push_back(std::make_shared<ThreeParamSIMDOGate>(type, input1, output, param1, param2, param3, gates_.size()));
+    num_wires += input1.size();
+    return output;
+  }
+
+  // Function to add a parametrized multiple in + out gate with which an additional optional flag param
+  // that is set to false by default. assumes #in = #out
+  std::vector<wire_t> addParamWithOptMGate(GateType type, const std::vector<wire_t>& input1, size_t param, bool flag = false) {
     if (type != GateType::kShuffle) {
       throw std::invalid_argument("Invalid gate type.");
     }
@@ -301,11 +551,28 @@ class Circuit {
     }
 
     std::vector<wire_t> output(input1.size());
-    for(int i=0; i< input1.size(); i++){
-      output[i] = i + gates_.size();
+    for(size_t i=0; i< input1.size(); i++){
+      output[i] = i + num_wires;
     }
-    gates_.push_back(std::make_shared<SIMDOGate>(type, input1, output));
+    gates_.push_back(std::make_shared<ParamWithFlagSIMDOGate>(type, input1, output, param, flag, gates_.size()));
     num_wires += input1.size();
+    return output;
+  }
+
+  // Function to add a parametrized gate with fan-in 1.
+  wire_t addParamGate(GateType type, wire_t input1, size_t param) {
+    if (type != GateType::kEqualsZero) {
+      throw std::invalid_argument("Invalid gate type.");
+    }
+
+    if (!isWireValid(input1)) {
+      throw std::invalid_argument("Invalid wire ID.");
+    }
+
+    wire_t output = num_wires;
+    gates_.push_back(std::make_shared<ParamFIn1Gate>(type, input1, output, param, gates_.size()));
+    num_wires += 1;
+
     return output;
   }
 
@@ -314,126 +581,432 @@ class Circuit {
 
     LevelOrderedCircuit res;
     res.outputs = outputs_;
+    res.output_bin = output_bin_;
     res.num_gates = gates_.size();
     res.num_wires = num_wires;
 
     // Map from output wire id to multiplicative depth/level.
     // Input gates have a depth of 0.
-    std::vector<size_t> gate_level(num_wires, 0);
+    std::vector<size_t> gate_level(gates_.size(), 0);
+    std::vector<size_t> wire_level(num_wires, 0);
     size_t depth = 0;
 
 
 
     // This assumes that if gates_[i]'s output is input to gates_[j] then
     // i < j.
+    // Also, a layer should not contain non-interactive gates feeding into interactive gates.
+    // So, a layer consists of (independent) interactive gates and THEN non-interactive gates that can also depend on each other.
+    // To do so, a non-interactive gate inherits the layer of its predecessor(s), maximum if multiple different.
+    // Interactive gates are one layer after their last (regarding layers) predecessor.
+    // Hence, non-interactive gates remain in the same layer as prior interactive gates,
+    // but with each interactive gate, a new layer begins.
     for (const auto& gate : gates_) {
       switch (gate->type) {
         case GateType::kAdd:
+        case GateType::kXor:
         case GateType::kSub: {
           const auto* g = static_cast<FIn2Gate*>(gate.get());
-          gate_level[g->out] = std::max(gate_level[g->in1], gate_level[g->in2]);
-          depth = std::max(depth, gate_level[gate->out]);
+          size_t gate_depth = std::max(wire_level[g->in1], wire_level[g->in2]);
+
+          gate_level[g->gid] = gate_depth;
+          wire_level[g->out] = gate_depth;
+
+          if (DEPTH_ASSIGN_VERBOSE) 
+            std::cout << "DEPTH ASSIGN add/xor/sub gate at depth " << gate_depth << std::endl;
+
+          depth = std::max(depth, gate_depth);
           break;
         }
 
+        case GateType::kAnd:
         case GateType::kMul: {
           const auto* g = static_cast<FIn2Gate*>(gate.get());
-          gate_level[g->out] = std::max(gate_level[g->in1], gate_level[g->in2]) + 1;
-          depth = std::max(depth, gate_level[gate->out]);
+          size_t gate_depth = std::max(wire_level[g->in1], wire_level[g->in2]);
+          gate_depth += 1;
+          gate_level[g->gid] = gate_depth;
+          wire_level[g->out] = gate_depth;
+
+          if (DEPTH_ASSIGN_VERBOSE) 
+            std::cout << "DEPTH ASSIGN and/mult gate at depth " << gate_depth << std::endl;
+
+          depth = std::max(depth, gate_depth);
+          break;
+        }
+
+        case GateType::kConvertB2A: {
+          const auto* g = static_cast<FIn1Gate*>(gate.get());
+          size_t gate_depth = wire_level[g->in];
+          gate_depth += 1;
+          gate_level[g->gid] = gate_depth;
+          wire_level[g->out] = gate_depth;
+
+          if (DEPTH_ASSIGN_VERBOSE) 
+            std::cout << "DEPTH ASSIGN b2a gate at depth " << gate_depth << std::endl;
+
+          depth = std::max(depth, gate_depth);
+          break;
+        }
+
+        case GateType::kEqualsZero: {
+          const auto* g = static_cast<ParamFIn1Gate*>(gate.get());
+          size_t gate_depth = wire_level[g->in];
+          gate_depth += 1;
+          gate_level[g->gid] = gate_depth;
+          wire_level[g->out] = gate_depth;
+
+          if (DEPTH_ASSIGN_VERBOSE) 
+            std::cout << "DEPTH ASSIGN eq0 gate at depth " << gate_depth << std::endl;
+
+          depth = std::max(depth, gate_depth);
           break;
         }
         case GateType::kMul3: {
           const auto* g = static_cast<FIn3Gate*>(gate.get());
-          size_t gate_depth = std::max(gate_level[g->in1], gate_level[g->in2]);
-          gate_depth = std::max(gate_depth, gate_level[g->in3]);
-          gate_level[g->out] = gate_depth + 1;
-          depth = std::max(depth, gate_level[gate->out]);
+          size_t gate_depth = std::max(wire_level[g->in1], wire_level[g->in2]);
+          gate_depth = std::max(gate_depth, wire_level[g->in3]);
+          gate_depth += 1;
+          gate_level[g->gid] = gate_depth;
+          wire_level[g->out] = gate_depth;
+
+          if (DEPTH_ASSIGN_VERBOSE) 
+            std::cout << "DEPTH ASSIGN mult3 gate at depth " << gate_depth << std::endl;
+
+          depth = std::max(depth, gate_depth);
           break;
         }
 
         case GateType::kMul4: {
           const auto* g = static_cast<FIn4Gate*>(gate.get());
-          size_t gate_depth = std::max(gate_level[g->in1], gate_level[g->in2]);
-          gate_depth = std::max(gate_depth, gate_level[g->in3]);
-          gate_depth = std::max(gate_depth, gate_level[g->in4]);
-          gate_level[g->out] = gate_depth + 1;
-          depth = std::max(depth, gate_level[gate->out]);
+          size_t gate_depth = std::max(wire_level[g->in1], wire_level[g->in2]);
+          gate_depth = std::max(gate_depth, wire_level[g->in3]);
+          gate_depth = std::max(gate_depth, wire_level[g->in4]);
+          gate_depth += 1;
+          gate_level[g->gid] = gate_depth;
+          wire_level[g->out] = gate_depth;
+
+          if (DEPTH_ASSIGN_VERBOSE) 
+            std::cout << "DEPTH ASSIGN mult4 gate at depth " << gate_depth << std::endl;
+
+          depth = std::max(depth, gate_depth);
           break;
         }
 
         case GateType::kConstAdd:
         case GateType::kConstMul: {
           const auto* g = static_cast<ConstOpGate<R>*>(gate.get());
-          gate_level[g->out] = gate_level[g->in];
-          depth = std::max(depth, gate_level[gate->out]);
+          size_t gate_depth = wire_level[g->in];
+          gate_level[g->gid] = gate_depth;
+          wire_level[g->out] = gate_depth;
+
+          if (DEPTH_ASSIGN_VERBOSE) 
+            std::cout << "DEPTH ASSIGN cAdd/cMul gate at depth " << gate_depth << std::endl;
+
+          depth = std::max(depth, gate_depth);
           break;
         }
-
-        case GateType::kEqz: {
-          const auto* g = static_cast<FIn1Gate*>(gate.get());
-          gate_level[g->out] = gate_level[g->in] + 1;
-          depth = std::max(depth, gate_level[gate->out]);
-          break;
-        }
-
-        case GateType::kLtz: {
-          const auto* g = static_cast<FIn1Gate*>(gate.get());
-          gate_level[g->out] = gate_level[g->in] + 1;
-          depth = std::max(depth, gate_level[gate->out]);
-          break;
-        }
-
-        case GateType::kRelu: {
-          const auto* g = static_cast<FIn1Gate*>(gate.get());
-          gate_level[g->out] = gate_level[g->in] + 1;
-          depth = std::max(depth, gate_level[gate->out]);
-          break;
-        }
-
-        case GateType::kMsb: {
-          const auto* g = static_cast<FIn1Gate*>(gate.get());
-          gate_level[g->out] = gate_level[g->in] + 1;
-          depth = std::max(depth, gate_level[gate->out]);
-          break;
-        }
-
-        case GateType::kDotprod:
-        case GateType::kTrdotp: {
-          const auto* g = static_cast<SIMDGate*>(gate.get());
-          size_t gate_depth = 0;
-          for (size_t i = 0; i < g->in1.size(); ++i) {
-            gate_depth = std::max(
-                {gate_level[g->in1[i]], gate_level[g->in2[i]], gate_depth});
-          }
-          gate_level[g->out] = gate_depth + 1;
-          depth = std::max(depth, gate_level[gate->out]);
-          break;
-        }
-
 
         case GateType::kShuffle: {
+          const auto* g = static_cast<ParamWithFlagSIMDOGate*>(gate.get());
+          size_t gate_depth = 0;
 
+          for (size_t i = 0; i < g->in1.size(); i++) {
+            gate_depth = std::max(
+                {wire_level[g->in1[i]], gate_depth});
+          }
+          gate_depth += 1;
+
+          gate_level[g->gid] = gate_depth;
+          for(size_t i = 0; i < g->outs.size(); i++){
+            wire_level[g->outs[i]] = gate_depth;
+          }
+
+          if (DEPTH_ASSIGN_VERBOSE) 
+            std::cout << "DEPTH ASSIGN shuffle gate at depth " << gate_depth << std::endl;
+
+          depth = std::max(depth, gate_depth);
+          break;
+        }
+
+        case GateType::kDoubleShuffle: {
+          const auto* g = static_cast<ThreeParamSIMDOGate*>(gate.get());
+          size_t gate_depth = 0;
+
+          for (size_t i = 0; i < g->in1.size(); i++) {
+            gate_depth = std::max(
+                {wire_level[g->in1[i]], gate_depth});
+          }
+          gate_depth += 1;
+
+          gate_level[g->gid] = gate_depth;
+          for(size_t i = 0; i < g->outs.size(); i++){
+            wire_level[g->outs[i]] = gate_depth;
+          }
+
+          if (DEPTH_ASSIGN_VERBOSE) 
+            std::cout << "DEPTH ASSIGN doubleShuffle gate at depth " << gate_depth << std::endl;
+
+          depth = std::max(depth, gate_depth);
+          break;
+        }
+
+        case GateType::kGenCompaction: {
           const auto* g = static_cast<SIMDOGate*>(gate.get());
           size_t gate_depth = 0;
 
           for (size_t i = 0; i < g->in1.size(); i++) {
             gate_depth = std::max(
-                {gate_level[g->in1[i]], gate_depth});
+                {wire_level[g->in1[i]], gate_depth});
+          }
+          gate_depth += 1;
+
+          gate_level[g->gid] = gate_depth;
+          for(size_t i = 0; i < g->outs.size(); i++){
+            wire_level[g->outs[i]] = gate_depth;
           }
 
-          for(int i = 0; i < g->outs.size(); i++){
-            gate_level[g->outs[i]] = gate_depth + 1;
+          if (DEPTH_ASSIGN_VERBOSE) 
+            std::cout << "DEPTH ASSIGN genCompaction gate at depth " << gate_depth << std::endl;
+
+          depth = std::max(depth, gate_depth);
+          break;
+        }
+
+        case GateType::kReveal: {
+          const auto* g = static_cast<SIMDOGate*>(gate.get());
+          size_t gate_depth = 0;
+
+          for (size_t i = 0; i < g->in1.size(); i++) {
+            gate_depth = std::max(
+                {wire_level[g->in1[i]], gate_depth});
+          }
+          gate_depth += 1;
+
+          gate_level[g->gid] = gate_depth;
+          for(size_t i = 0; i < g->outs.size(); i++){
+            wire_level[g->outs[i]] = gate_depth;
           }
 
-          depth = std::max(depth, gate_level[gate->outs[0]]);
+          if (DEPTH_ASSIGN_VERBOSE) 
+            std::cout << "DEPTH ASSIGN reveal gate at depth " << gate_depth << std::endl;
 
+          depth = std::max(depth, gate_depth);
+          break;
+        }
 
+        case GateType::kFlip: {
+          const auto* g = static_cast<SIMDOGate*>(gate.get());
+          size_t gate_depth = 0;
+
+          for (size_t i = 0; i < g->in1.size(); i++) {
+            gate_depth = std::max(
+                {wire_level[g->in1[i]], gate_depth});
+          }
+
+          gate_level[g->gid] = gate_depth;
+          for(size_t i = 0; i < g->outs.size(); i++){
+            wire_level[g->outs[i]] = gate_depth;
+          }
+
+          if (DEPTH_ASSIGN_VERBOSE) 
+            std::cout << "DEPTH ASSIGN flip gate at depth " << gate_depth << std::endl;
+
+          depth = std::max(depth, gate_depth);
+          break;
+        }
+
+        case GateType::kAddConstToVec: {
+          const auto* g = static_cast<TwoParamSIMDOGate*>(gate.get());
+          size_t gate_depth = 0;
+
+          for (size_t i = 0; i < g->in1.size(); i++) {
+            gate_depth = std::max(
+                {wire_level[g->in1[i]], gate_depth});
+          }
+
+          gate_level[g->gid] = gate_depth;
+          for(size_t i = 0; i < g->outs.size(); i++){
+            wire_level[g->outs[i]] = gate_depth;
+          }
+
+          if (DEPTH_ASSIGN_VERBOSE) 
+            std::cout << "DEPTH ASSIGN addConstToVec gate at depth " << gate_depth << std::endl;
+
+          depth = std::max(depth, gate_depth);
+          break;
+        }
+
+        case GateType::kPreparePropagate: {
+          const auto* g = static_cast<ParamSIMDOGate*>(gate.get());
+          size_t gate_depth = 0;
+
+          for (size_t i = 0; i < g->in1.size(); i++) {
+            gate_depth = std::max(
+                {wire_level[g->in1[i]], gate_depth});
+          }
+
+          gate_level[g->gid] = gate_depth;
+          for(size_t i = 0; i < g->outs.size(); i++){
+            wire_level[g->outs[i]] = gate_depth;
+          }
+
+          if (DEPTH_ASSIGN_VERBOSE) 
+            std::cout << "DEPTH ASSIGN preparePropagate gate at depth " << gate_depth << std::endl;
+
+          depth = std::max(depth, gate_depth);
+          break;
+        }
+
+        case GateType::kPropagate: {
+          const auto* g = static_cast<SIMDODoubleInGate*>(gate.get());
+          size_t gate_depth = 0;
+
+          for (size_t i = 0; i < g->in1.size(); i++) {
+            gate_depth = std::max(
+                {wire_level[g->in1[i]], gate_depth});
+          }
+          for (size_t i = 0; i < g->in2.size(); i++) {
+            gate_depth = std::max(
+                {wire_level[g->in2[i]], gate_depth});
+          }
+
+          gate_level[g->gid] = gate_depth;
+          for(size_t i = 0; i < g->outs.size(); i++){
+            wire_level[g->outs[i]] = gate_depth;
+          }
+
+          if (DEPTH_ASSIGN_VERBOSE) 
+            std::cout << "DEPTH ASSIGN propagate gate at depth " << gate_depth << std::endl;
+
+          depth = std::max(depth, gate_depth);
+          break;
+        }
+
+        case GateType::kAddVec: {
+          const auto* g = static_cast<SIMDODoubleInGate*>(gate.get());
+          size_t gate_depth = 0;
+
+          for (size_t i = 0; i < g->in1.size(); i++) {
+            gate_depth = std::max(
+                {wire_level[g->in1[i]], gate_depth});
+          }
+          for (size_t i = 0; i < g->in2.size(); i++) {
+            gate_depth = std::max(
+                {wire_level[g->in2[i]], gate_depth});
+          }
+
+          gate_level[g->gid] = gate_depth;
+          for(size_t i = 0; i < g->outs.size(); i++){
+            wire_level[g->outs[i]] = gate_depth;
+          }
+
+          if (DEPTH_ASSIGN_VERBOSE) 
+            std::cout << "DEPTH ASSIGN vedAdd gate at depth " << gate_depth << std::endl;
+
+          depth = std::max(depth, gate_depth);
+          break;
+        }
+
+        case GateType::kPrepareGather: {
+          const auto* g = static_cast<SIMDOGate*>(gate.get());
+          size_t gate_depth = 0;
+
+          for (size_t i = 0; i < g->in1.size(); i++) {
+            gate_depth = std::max(
+                {wire_level[g->in1[i]], gate_depth});
+          }
+
+          gate_level[g->gid] = gate_depth;
+          for(size_t i = 0; i < g->outs.size(); i++){
+            wire_level[g->outs[i]] = gate_depth;
+          }
+
+          if (DEPTH_ASSIGN_VERBOSE) 
+            std::cout << "DEPTH ASSIGN prepareGather gate at depth " << gate_depth << std::endl;
+
+          depth = std::max(depth, gate_depth);
+          break;
+        }
+
+        case GateType::kGather: {
+          const auto* g = static_cast<ParamSIMDOGate*>(gate.get());
+          size_t gate_depth = 0;
+
+          for (size_t i = 0; i < g->in1.size(); i++) {
+            gate_depth = std::max(
+                {wire_level[g->in1[i]], gate_depth});
+          }
+
+          gate_level[g->gid] = gate_depth;
+          for(size_t i = 0; i < g->outs.size(); i++){
+            wire_level[g->outs[i]] = gate_depth;
+          }
+
+          if (DEPTH_ASSIGN_VERBOSE) 
+            std::cout << "DEPTH ASSIGN gather gate at depth " << gate_depth << std::endl;
+
+          depth = std::max(depth, gate_depth);
+          break;
+        }
+
+        case GateType::kCompose:
+        {
+          const auto* g = static_cast<SIMDSingleOutGate*>(gate.get());
+          size_t gate_depth = 0;
+
+          for (size_t i = 0; i < g->in1.size(); i++) {
+            gate_depth = std::max(
+                {wire_level[g->in1[i]], gate_depth});
+          }
+
+          gate_level[g->gid] = gate_depth;
+          wire_level[g->out] = gate_depth;
+
+          if (DEPTH_ASSIGN_VERBOSE) 
+            std::cout << "DEPTH ASSIGN compose gate at depth " << gate_depth << std::endl;
+
+          depth = std::max(depth, gate_depth);
+          break;
+        }
+
+        case GateType::kReorder: 
+        case GateType::kReorderInverse:
+        {
+          const auto* g = static_cast<SIMDODoubleInGate*>(gate.get());
+          size_t gate_depth = 0;
+
+          for (size_t i = 0; i < g->in1.size(); i++) {
+            gate_depth = std::max(
+                {wire_level[g->in1[i]], gate_depth});
+          }
+          for (size_t i = 0; i < g->in2.size(); i++) {
+            gate_depth = std::max(
+                {wire_level[g->in2[i]], gate_depth});
+          }
+
+          gate_level[g->gid] = gate_depth;
+          for(size_t i = 0; i < g->outs.size(); i++){
+            wire_level[g->outs[i]] = gate_depth;
+          }
+
+          if (DEPTH_ASSIGN_VERBOSE) 
+            std::cout << "DEPTH ASSIGN reorder(inverse) gate at depth " << gate_depth << std::endl;
+
+          depth = std::max(depth, gate_depth);
           break;
         }
         
+        case ::common::utils::GateType::kInp:
+        case ::common::utils::GateType::kBinInp:
+        {
+          break;
+        }
 
         default:
-          break;
+        {
+          std::cout << gate->type << std::endl;
+          throw std::runtime_error("UNSUPPORTED GATE discovered during circuit compiling (see above)");
+        }
       }
 
       
@@ -448,15 +1021,9 @@ class Circuit {
 
     for (const auto& gate : gates_) {
       res.count[gate->type]++;
-      if (gate->type == GateType::kShuffle) {
-        gates_by_level[gate_level[gate->outs[0]]].push_back(gate);
-      }
-      else{
-        gates_by_level[gate_level[gate->out]].push_back(gate);
-      } 
+      gates_by_level[gate_level[gate->gid]].push_back(gate);
     }
 
-     std::cout<< "hereg\n";
 
     res.gates_by_level = std::move(gates_by_level);
 
@@ -804,12 +1371,12 @@ class Circuit {
     std::vector<wire_t> S;
 
     S.push_back(circ.addGate(GateType::kAdd, input_a[0], input_b[0]));
-    for (int i = 1; i < 64; i++) {
+    for (size_t i = 1; i < 64; i++) {
       auto w = circ.addGate(GateType::kAdd, input_a[i], input_b[i]);
       S.push_back(circ.addGate(GateType::kAdd, w, loc_g[i - 1]));
     }
 
-    for (int i = 0; i < 64; i++) {
+    for (size_t i = 0; i < 64; i++) {
       circ.setAsOutput(S[i]);
     }
     return circ;
@@ -821,16 +1388,16 @@ class Circuit {
     std::vector<wire_t> input_b(64);
 
     std::vector<wire_t> loc_p, loc_g;
-    for (int i = 0; i < 64; i++) {
+    for (size_t i = 0; i < 64; i++) {
       input_a[i] = circ.newInputWire();
     }
 
-    for (int i = 0; i < 64; i++) {
+    for (size_t i = 0; i < 64; i++) {
       input_b[i] = circ.newInputWire();
     }
 
     // input_a[0] stores the lsb.
-    for (int i = 0; i < 64; i++) {
+    for (size_t i = 0; i < 64; i++) {
       auto p_id = circ.addGate(GateType::kAdd, input_a[i], input_b[i]);
       loc_p.push_back(p_id);
       auto g_id = circ.addGate(GateType::kMul, input_a[i], input_b[i]);

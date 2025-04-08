@@ -4,29 +4,56 @@
 
 namespace common::utils {
 
-Gate::Gate(GateType type, wire_t out) : type(type), out(out) {}
+Gate::Gate(GateType type, wire_t out, size_t gid) : type(type), out(out), gid(gid) {}
 
-Gate::Gate(GateType type, wire_t out, std::vector<wire_t> outs) : type(type), out(out) ,outs(outs) {}
+Gate::Gate(GateType type, wire_t out, std::vector<wire_t> outs, size_t gid) : type(type), out(out) ,outs(outs), gid(gid) {}
 
-FIn2Gate::FIn2Gate(GateType type, wire_t in1, wire_t in2, wire_t out)
-    : Gate(type, out), in1{in1}, in2{in2} {}
+FIn2Gate::FIn2Gate(GateType type, wire_t in1, wire_t in2, wire_t out, size_t gid)
+    : Gate(type, out, gid), in1{in1}, in2{in2} {}
 
-FIn3Gate::FIn3Gate(GateType type, wire_t in1, wire_t in2, wire_t in3, wire_t out)
-    : Gate(type, out), in1{in1}, in2{in2}, in3{in3} {}
+FIn3Gate::FIn3Gate(GateType type, wire_t in1, wire_t in2, wire_t in3, wire_t out, size_t gid)
+    : Gate(type, out, gid), in1{in1}, in2{in2}, in3{in3} {}
 
-FIn4Gate::FIn4Gate(GateType type, wire_t in1, wire_t in2, wire_t in3, wire_t in4, wire_t out)
-    : Gate(type, out), in1{in1}, in2{in2}, in3{in3}, in4{in4} {}
+FIn4Gate::FIn4Gate(GateType type, wire_t in1, wire_t in2, wire_t in3, wire_t in4, wire_t out, size_t gid)
+    : Gate(type, out, gid), in1{in1}, in2{in2}, in3{in3}, in4{in4} {}
 
-FIn1Gate::FIn1Gate(GateType type, wire_t in, wire_t out)
-    : Gate(type, out), in{in} {}
+FIn1Gate::FIn1Gate(GateType type, wire_t in, wire_t out, size_t gid)
+    : Gate(type, out, gid), in{in} {}
+
+ParamFIn1Gate::ParamFIn1Gate(GateType type, wire_t in, wire_t out, size_t param, size_t gid)
+    : Gate(type, out, gid), in{in}, param{param} {}
 
 SIMDGate::SIMDGate(GateType type, std::vector<wire_t> in1,
-                   std::vector<wire_t> in2, wire_t out)
-    : Gate(type, out), in1(std::move(in1)), in2(std::move(in2)) {}
+                   std::vector<wire_t> in2, wire_t out, size_t gid)
+    : Gate(type, out, gid), in1(std::move(in1)), in2(std::move(in2)) {}
+
+SIMDSingleOutGate::SIMDSingleOutGate(GateType type, std::vector<wire_t> in1,
+                     wire_t out, size_t gid)
+    : Gate(type, out, gid), in1(std::move(in1)) {}
 
 SIMDOGate::SIMDOGate(GateType type, std::vector<wire_t> in1,
-                     std::vector<wire_t> outs)
-    : Gate(type, outs[0], outs), in1(std::move(in1)) {}
+                     std::vector<wire_t> outs, size_t gid)
+    : Gate(type, outs[0], outs, gid), in1(std::move(in1)) {}
+
+SIMDODoubleInGate::SIMDODoubleInGate(GateType type, std::vector<wire_t> in1, std::vector<wire_t> in2,
+                     std::vector<wire_t> outs, size_t gid)
+    : Gate(type, outs[0], outs, gid), in1(std::move(in1)), in2(std::move(in2)) {}
+
+ParamSIMDOGate::ParamSIMDOGate(GateType type, std::vector<wire_t> in1,
+                     std::vector<wire_t> outs, size_t param, size_t gid)
+    : Gate(type, outs[0], outs, gid), in1(std::move(in1)), param(param) {}
+
+TwoParamSIMDOGate::TwoParamSIMDOGate(GateType type, std::vector<wire_t> in1,
+                     std::vector<wire_t> outs, size_t param1, size_t param2, size_t gid)
+    : Gate(type, outs[0], outs, gid), in1(std::move(in1)), param1(param1), param2(param2) {}
+
+ThreeParamSIMDOGate::ThreeParamSIMDOGate(GateType type, std::vector<wire_t> in1,
+                     std::vector<wire_t> outs, size_t param1, size_t param2, size_t param3, size_t gid)
+    : Gate(type, outs[0], outs, gid), in1(std::move(in1)), param1(param1), param2(param2), param3(param3) {}
+
+ParamWithFlagSIMDOGate::ParamWithFlagSIMDOGate(GateType type, std::vector<wire_t> in1,
+                     std::vector<wire_t> outs, size_t param, bool flag, size_t gid)
+    : Gate(type, outs[0], outs, gid), in1(std::move(in1)), param(param), flag(flag) {}
 
 std::ostream& operator<<(std::ostream& os, GateType type) {
   switch (type) {
@@ -34,8 +61,16 @@ std::ostream& operator<<(std::ostream& os, GateType type) {
       os << "Input";
       break;
 
+    case kBinInp:
+      os << "Binary input";
+      break;
+
     case kAdd:
       os << "Addition";
+      break;
+
+    case kCompose:
+      os << "Compose (arithmetic) bits to number";
       break;
 
     case kMul:
@@ -69,12 +104,12 @@ std::ostream& operator<<(std::ostream& os, GateType type) {
     case kMsb:
       os << "MSB";
       break;
-    
+
     case kEqz:
       os << "Equals to zero";
       break;
 
-    case kLtz: 
+    case kLtz:
       os << "Less than zero";
       break;
 
@@ -87,7 +122,63 @@ std::ostream& operator<<(std::ostream& os, GateType type) {
       break;
 
     case kShuffle:
-      os << "Shufle a vector";
+      os << "Shuffle a vector";
+      break;
+
+    case kDoubleShuffle:
+      os << "Shuffle a vector by two consecutive permutations";
+      break;
+
+    case kGenCompaction:
+      os << "Compute compaction permutation of a vector containing bits";
+      break;
+
+    case kXor:
+      os << "xor";
+      break;
+
+    case kAnd:
+      os << "and";
+      break;
+
+    case kReveal:
+      os << "Reveal";
+      break;
+
+    case kFlip:
+      os << "Flip";
+      break;
+
+    case kAddConstToVec:
+      os << "AddConstToVec";
+      break;
+
+    case kAddVec:
+      os << "AddVec";
+      break;
+
+    case kPreparePropagate:
+      os << "PreparePropagate";
+      break;
+
+    case kPrepareGather:
+      os << "PrepareGather";
+      break;
+
+    case kPropagate:
+      os << "Propagate";
+      break;
+
+    case kGather:
+      os << "Gather";
+      break;
+
+    case kReorder:
+      os << "Reorder";
+      break;
+
+    case kReorderInverse:
+      os << "ReorderInverse";
       break;
 
     default:

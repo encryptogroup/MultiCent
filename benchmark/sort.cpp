@@ -8,56 +8,58 @@
 #include <cmath>
 #include <iostream>
 #include <memory>
+#include <random>
 
 #include "utils.h"
 #include "benchmark.h"
+#include "subcircuits.h"
 
 using namespace graphsc;
 using json = nlohmann::json;
 namespace bpo = boost::program_options;
 
+const int USED_BITS = 32; // TODO could be decreased to improve efficiency if applicable
 
 std::tuple<common::utils::LevelOrderedCircuit, std::vector<std::vector<common::utils::wire_t>>> generateCircuit(size_t n) {
     
     common::utils::Circuit<Ring> circ;
+    size_t next_free_shuffle_id = 0;
 
     /*
     Circuit idea:
-    Input vectors x, y, z of equal size n
-    Compute pi^(-1)(pi(x)), rho(y), rho(z) for random permutations pi, rho.
+    Input vectors x_0, x_1, ..., x_(USED_BITS-1), x where x_0 contains the LSBs of entries in x, x_1 the next bits etc.
+    while everything is shared arithmetically.
+    Output x in ascending order
 
     Communication:
-    Setup: P0 sends 8n bytes to set up 2 permutations and 32n bytes for the masks
-    Online: P1/P2 each send 16n bytes + 12n to reveal outputs => 28n
-    3 rounds including output stage
+    32n*USED_BITS - 8n bytes setup
+    24n*USED_BITS bytes online
+    4*USED_BITS rounds
     */
 
-    std::vector<std::vector<common::utils::wire_t>> input_vectors;
-    input_vectors.push_back(std::vector<common::utils::wire_t>(n));
-    std::generate(input_vectors[0].begin(), input_vectors[0].end(),
-                [&]() { return circ.newInputWire(); });
-    input_vectors.push_back(std::vector<common::utils::wire_t>(n));
-    std::generate(input_vectors[1].begin(), input_vectors[1].end(),
-                [&]() { return circ.newInputWire(); });
-    input_vectors.push_back(std::vector<common::utils::wire_t>(n));
-    std::generate(input_vectors[2].begin(), input_vectors[2].end(),
-                [&]() { return circ.newInputWire(); });
+    // vector of LSBs, then vector of bits before that, ..., vector of MSBs and finally vector of overall numbers (only used as payload)
+    std::vector<std::vector<common::utils::wire_t>> input_vectors(USED_BITS + 1);
+    std::vector<std::vector<common::utils::wire_t>> bit_vectors(USED_BITS);
 
-    auto pi_x = circ.addParamWithOptMGate(common::utils::GateType::kShuffle, input_vectors[0], 0);
-    auto outputs_x = circ.addParamWithOptMGate(common::utils::GateType::kShuffle, pi_x, 0, true);
-    auto outputs_y = circ.addParamWithOptMGate(common::utils::GateType::kShuffle, input_vectors[1], 1);
-    auto outputs_z = circ.addParamWithOptMGate(common::utils::GateType::kShuffle, input_vectors[2], 1);
+    // Order of inputs shall be row by row, first bit decomposition starting at LSB and after the MSB also the arithmetic payload
+    for (size_t i = 0; i < USED_BITS + 1; i++) {
+        for (size_t j = 0; j < n; j++) {
+            input_vectors[i].push_back(circ.newInputWire());
+        }
+    }
+    for (size_t i = 0; i < USED_BITS; i++)
+        bit_vectors[i] = input_vectors[i];
 
-    for (auto i : outputs_x) {
-        circ.setAsOutput(i);
+    // Compute permutation required to sort
+    // 32n*USED_BITS - 28n  +  24n*USED_BITS - 16n   in 4*USED_BITS - 3 rounds
+    auto sorting_perm = subcirc::genSortingPerm(bit_vectors, circ, next_free_shuffle_id, USED_BITS);
+    // Apply sorting permutation to payload
+    auto output_vector = subcirc::applyPerm(sorting_perm, input_vectors[USED_BITS], circ, next_free_shuffle_id); // 20n + 12n in 2 rounds
+
+    for (auto i : output_vector) {
+        circ.setAsOutput(i); // 0 + 4n in 1 round
     }
-    for (auto i : outputs_y) {
-        circ.setAsOutput(i);
-    }
-    for (auto i : outputs_z) {
-        circ.setAsOutput(i);
-    }
-    
+
     return {circ.orderGatesByLevel(), input_vectors};
 }
 
@@ -95,25 +97,29 @@ void benchmark(const bpo::variables_map& opts) {
 
     std::unordered_map<common::utils::wire_t, Ring> input_to_val;
     std::unordered_map<common::utils::wire_t, int> input_to_pid;
-    assert(input_vectors.size() == 3);
-    for (size_t i = 0; i < 3; i++)
+    assert(input_vectors.size() == USED_BITS + 1);
+    for (size_t i = 0; i < USED_BITS + 1; i++)
         assert(input_vectors[i].size() == vec_size);
-    // Set first vector to 0,1,...
-    for (size_t i = 0; i < vec_size; i++)
-        input_to_val[input_vectors[0][i]] = i;
-    // Set second vector to 0,1,...
-    for (size_t i = 0; i < vec_size; i++)
-        input_to_val[input_vectors[1][i]] = i;
-    // Set third vector to 0,2,4,6,...
-    for (size_t i = 0; i < vec_size; i++)
-        input_to_val[input_vectors[2][i]] = i << 1;
 
-    for (size_t i = 0; i < 3; i++) {
+    // Random numbers
+    std::random_device dev;
+    std::mt19937 rng(dev()); // this will output different numbers per party, but only one provides input anyway
+    std::uniform_int_distribution<std::mt19937::result_type> dist(0,2 << 30);
+
+    for (size_t i = 0; i < vec_size; i++) {
+        Ring x = dist(rng);
+        for (size_t j = 0; j < USED_BITS; j++) {
+            input_to_val[input_vectors[j][i]] = (x >> j) & 1;
+        }
+        input_to_val[input_vectors[USED_BITS][i]] = x;
+    }
+
+    for (size_t i = 0; i < USED_BITS + 1; i++) {
         for (auto in: input_vectors[i]) {
             input_to_pid[in] = 2;
         }
     }
-
+    
     for (size_t r = 0; r < repeat; ++r) {
         std::cout << "--- Repetition " << r + 1 << " ---" << std::endl;
 
@@ -146,26 +152,18 @@ void benchmark(const bpo::variables_map& opts) {
         }
 
         if (pid != 0) {
-            // First vec_size elements should be 0,1,...
-            for (size_t i = 0; i < vec_size; i++)
-                assert(res[i] == i);
-            // Second vector should not be in original order
-            // This could fail if you are really unlucky or the vector is too small
-            bool different = false;
-            for (size_t i = 0; i < vec_size; i++)
-                different = different || (res[vec_size + i] != i);
-            assert(different);
-            // Third vector should be second * 2 as it is shuffled the same way
-            for (size_t i = 0; i < vec_size; i++)
-                assert(res[2 * vec_size + i] == 2 * res[vec_size + i]);
+            // All outputs should be in correct order
+            for (size_t i = 0; i < vec_size - 1; i++) {
+                assert(res[i] <= res[i + 1]);
+            }
 
-            assert(bytes_sent == 28 * vec_size);
+            assert(bytes_sent == 24 * vec_size * USED_BITS);
             assert(bytes_sent_pre == 0);
         } else {
             assert(bytes_sent == 0);
-            assert(bytes_sent_pre - 56 == 40 * vec_size); // 56 always sent to synchronize vector sizes
+            assert(bytes_sent_pre - 56 == 32 * vec_size * USED_BITS - 8 * vec_size); // 56 always sent to synchronize vector sizes
         }
-        assert(circ.gates_by_level.size() == 3);
+        assert(circ.gates_by_level.size() == 4 * USED_BITS);
 
         
         std::cout << "time: " << rbench["time"] << " ms" << std::endl;
@@ -190,7 +188,7 @@ void benchmark(const bpo::variables_map& opts) {
 int main(int argc, char* argv[]) {
     auto prog_opts(bench::programOptions());
     bpo::options_description cmdline(
-      "Benchmark a simple test for unshuffling and unshuffling");
+      "Benchmark a simple test for sorting using radix sort");
     cmdline.add(prog_opts);
     cmdline.add_options()(
       "config,c", bpo::value<std::string>(),

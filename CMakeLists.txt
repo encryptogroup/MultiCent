@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 
 # Set the project name and version
-project(Asterisk VERSION 0.1)
+project(MultiCent VERSION 0.1)
 
 # Specify the C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -12,6 +12,10 @@ set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS}")
 # Path to custom cmake files for external libs
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
+set(CMAKE_THREAD_LIBS_INIT "-lpthread")
+set(CMAKE_HAVE_THREADS_LIBRARY 1)
+set(CMAKE_USE_WIN32_THREADS_INIT 0)
+set(CMAKE_USE_PTHREADS_INIT 1)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 
 # Find external dependencies

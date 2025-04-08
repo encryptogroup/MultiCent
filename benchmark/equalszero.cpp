@@ -17,55 +17,42 @@ using json = nlohmann::json;
 namespace bpo = boost::program_options;
 
 
-std::tuple<common::utils::LevelOrderedCircuit, std::vector<std::vector<common::utils::wire_t>>> generateCircuit(size_t n) {
-    
+std::tuple<common::utils::LevelOrderedCircuit, std::vector<common::utils::wire_t>> generateCircuit() {
     common::utils::Circuit<Ring> circ;
 
     /*
     Circuit idea:
-    Input vectors x, y, z of equal size n
-    Compute pi^(-1)(pi(x)), rho(y), rho(z) for random permutations pi, rho.
+    Arithmetic inputs a, b, c, d, e
+    Just compute EQZ on all of them, i.e., output arithmetic 1 if and only if value is 0.
 
-    Communication:
-    Setup: P0 sends 8n bytes to set up 2 permutations and 32n bytes for the masks
-    Online: P1/P2 each send 16n bytes + 12n to reveal outputs => 28n
-    3 rounds including output stage
+    Each EQZ layer has the cost of an AND and B2A has the cost of a MULT
+    =>
+    120 bytes offline, 240 + 20 bytes online, 6 + 1 rounds
     */
 
-    std::vector<std::vector<common::utils::wire_t>> input_vectors;
-    input_vectors.push_back(std::vector<common::utils::wire_t>(n));
-    std::generate(input_vectors[0].begin(), input_vectors[0].end(),
-                [&]() { return circ.newInputWire(); });
-    input_vectors.push_back(std::vector<common::utils::wire_t>(n));
-    std::generate(input_vectors[1].begin(), input_vectors[1].end(),
-                [&]() { return circ.newInputWire(); });
-    input_vectors.push_back(std::vector<common::utils::wire_t>(n));
-    std::generate(input_vectors[2].begin(), input_vectors[2].end(),
-                [&]() { return circ.newInputWire(); });
+    std::vector<common::utils::wire_t> inputs(5);
+    for (size_t i = 0; i < 5; i++) {
+        inputs[i] = circ.newInputWire();
+    }
 
-    auto pi_x = circ.addParamWithOptMGate(common::utils::GateType::kShuffle, input_vectors[0], 0);
-    auto outputs_x = circ.addParamWithOptMGate(common::utils::GateType::kShuffle, pi_x, 0, true);
-    auto outputs_y = circ.addParamWithOptMGate(common::utils::GateType::kShuffle, input_vectors[1], 1);
-    auto outputs_z = circ.addParamWithOptMGate(common::utils::GateType::kShuffle, input_vectors[2], 1);
+    std::vector<common::utils::wire_t> outputs(5);
+    for (size_t i = 0; i < 5; i++) {
+        auto level1 = circ.addParamGate(common::utils::GateType::kEqualsZero, inputs[i], 0);
+        auto level2 = circ.addParamGate(common::utils::GateType::kEqualsZero, level1, 1);
+        auto level3 = circ.addParamGate(common::utils::GateType::kEqualsZero, level2, 2);
+        auto level4 = circ.addParamGate(common::utils::GateType::kEqualsZero, level3, 3);
+        auto level5 = circ.addParamGate(common::utils::GateType::kEqualsZero, level4, 4);
+        outputs[i] = circ.addGate(common::utils::GateType::kConvertB2A, level5);
+    }
 
-    for (auto i : outputs_x) {
-        circ.setAsOutput(i);
-    }
-    for (auto i : outputs_y) {
-        circ.setAsOutput(i);
-    }
-    for (auto i : outputs_z) {
-        circ.setAsOutput(i);
-    }
-    
-    return {circ.orderGatesByLevel(), input_vectors};
+    for (size_t i = 0; i < 5; i++) 
+        circ.setAsOutput(outputs[i]);
+
+    return {circ.orderGatesByLevel(), inputs};
 }
 
 
 void benchmark(const bpo::variables_map& opts) {
-
-    auto vec_size = opts["vec-size"].as<size_t>();
-    
     size_t pid, repeat, threads;
     std::shared_ptr<io::NetIOMP> network = nullptr;
     uint64_t seeds_h[5];
@@ -78,8 +65,7 @@ void benchmark(const bpo::variables_map& opts) {
                                 {"threads", threads},
                                 {"seeds_h", seeds_h},
                                 {"seeds_l", seeds_l},
-                                {"repeat", repeat},
-                                {"vec-size", vec_size}};
+                                {"repeat", repeat}};
     output_data["benchmarks_pre"] = json::array();
     output_data["benchmarks"] = json::array();
 
@@ -89,29 +75,20 @@ void benchmark(const bpo::variables_map& opts) {
     }
     std::cout << std::endl;
 
-    auto [circ, input_vectors] = generateCircuit(vec_size);
+    auto [circ, inputs] = generateCircuit();
     std::cout << "--- Circuit ---\n";
     std::cout << circ << std::endl;
 
     std::unordered_map<common::utils::wire_t, Ring> input_to_val;
     std::unordered_map<common::utils::wire_t, int> input_to_pid;
-    assert(input_vectors.size() == 3);
-    for (size_t i = 0; i < 3; i++)
-        assert(input_vectors[i].size() == vec_size);
-    // Set first vector to 0,1,...
-    for (size_t i = 0; i < vec_size; i++)
-        input_to_val[input_vectors[0][i]] = i;
-    // Set second vector to 0,1,...
-    for (size_t i = 0; i < vec_size; i++)
-        input_to_val[input_vectors[1][i]] = i;
-    // Set third vector to 0,2,4,6,...
-    for (size_t i = 0; i < vec_size; i++)
-        input_to_val[input_vectors[2][i]] = i << 1;
-
-    for (size_t i = 0; i < 3; i++) {
-        for (auto in: input_vectors[i]) {
-            input_to_pid[in] = 2;
-        }
+    assert(inputs.size() == 5);
+    input_to_val[inputs[0]] = -1;
+    input_to_val[inputs[1]] = 0;
+    input_to_val[inputs[2]] = 1;
+    input_to_val[inputs[3]] = 2;
+    input_to_val[inputs[4]] = 811;
+    for (auto in: inputs) {
+        input_to_pid[in] = 2;
     }
 
     for (size_t r = 0; r < repeat; ++r) {
@@ -146,26 +123,19 @@ void benchmark(const bpo::variables_map& opts) {
         }
 
         if (pid != 0) {
-            // First vec_size elements should be 0,1,...
-            for (size_t i = 0; i < vec_size; i++)
-                assert(res[i] == i);
-            // Second vector should not be in original order
-            // This could fail if you are really unlucky or the vector is too small
-            bool different = false;
-            for (size_t i = 0; i < vec_size; i++)
-                different = different || (res[vec_size + i] != i);
-            assert(different);
-            // Third vector should be second * 2 as it is shuffled the same way
-            for (size_t i = 0; i < vec_size; i++)
-                assert(res[2 * vec_size + i] == 2 * res[vec_size + i]);
+            assert(res[0] == 0);
+            assert(res[1] == 1);
+            assert(res[2] == 0);
+            assert(res[3] == 0);
+            assert(res[4] == 0);
 
-            assert(bytes_sent == 28 * vec_size);
+            assert(bytes_sent == 260);
             assert(bytes_sent_pre == 0);
         } else {
             assert(bytes_sent == 0);
-            assert(bytes_sent_pre - 56 == 40 * vec_size); // 56 always sent to synchronize vector sizes
+            assert(bytes_sent_pre - 56 == 120); // 56 always sent to synchronize vector sizes
         }
-        assert(circ.gates_by_level.size() == 3);
+        assert(circ.gates_by_level.size() == 7);
 
         
         std::cout << "time: " << rbench["time"] << " ms" << std::endl;
@@ -176,7 +146,7 @@ void benchmark(const bpo::variables_map& opts) {
     output_data["stats"] = {{"peak_virtual_memory", peakVirtualMemory()},
                             {"peak_resident_set_size", peakResidentSetSize()}};
 
-    std::cout << "--- Overall Statistics ---\n";
+    std::cout << "--- Statistics ---\n";
     for (const auto& [key, value] : output_data["stats"].items()) {
         std::cout << key << ": " << value << "\n";
     }
@@ -190,12 +160,12 @@ void benchmark(const bpo::variables_map& opts) {
 int main(int argc, char* argv[]) {
     auto prog_opts(bench::programOptions());
     bpo::options_description cmdline(
-      "Benchmark a simple test for unshuffling and unshuffling");
+      "Benchmark a test for EQZ checks");
     cmdline.add(prog_opts);
     cmdline.add_options()(
       "config,c", bpo::value<std::string>(),
       "configuration file for easy specification of cmd line arguments")(
-      "help,h", "produce help message") ("vec-size,v", bpo::value<size_t>()->required(), "Number of vector elements.");
+      "help,h", "produce help message");
 
     bpo::variables_map opts = bench::parseOptions(cmdline, prog_opts, argc, argv);
     if (opts.count("pid") == 0) {

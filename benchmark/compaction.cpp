@@ -23,13 +23,13 @@ std::tuple<common::utils::LevelOrderedCircuit, std::vector<std::vector<common::u
 
     /*
     Circuit idea:
-    Input vectors x, y, z of equal size n
-    Compute pi^(-1)(pi(x)), rho(y), rho(z) for random permutations pi, rho.
+    Input vectors x, y, each of size n, all values are 0/1 (but still arithmetically shared)
+    Compute permutation to apply to x to order the bits, also compute ordered version of y.
 
     Communication:
-    Setup: P0 sends 8n bytes to set up 2 permutations and 32n bytes for the masks
-    Online: P1/P2 each send 16n bytes + 12n to reveal outputs => 28n
-    3 rounds including output stage
+    Setup: 2n multiplications, 2 shuffles (same perm) => 28n bytes
+    Online: 2n multiplications, 2 shuffles (same perm), n reveals, 2n reveals => 36n bytes
+    Rounds: 4 including output
     */
 
     std::vector<std::vector<common::utils::wire_t>> input_vectors;
@@ -39,14 +39,19 @@ std::tuple<common::utils::LevelOrderedCircuit, std::vector<std::vector<common::u
     input_vectors.push_back(std::vector<common::utils::wire_t>(n));
     std::generate(input_vectors[1].begin(), input_vectors[1].end(),
                 [&]() { return circ.newInputWire(); });
-    input_vectors.push_back(std::vector<common::utils::wire_t>(n));
-    std::generate(input_vectors[2].begin(), input_vectors[2].end(),
-                [&]() { return circ.newInputWire(); });
 
-    auto pi_x = circ.addParamWithOptMGate(common::utils::GateType::kShuffle, input_vectors[0], 0);
-    auto outputs_x = circ.addParamWithOptMGate(common::utils::GateType::kShuffle, pi_x, 0, true);
-    auto outputs_y = circ.addParamWithOptMGate(common::utils::GateType::kShuffle, input_vectors[1], 1);
-    auto outputs_z = circ.addParamWithOptMGate(common::utils::GateType::kShuffle, input_vectors[2], 1);
+    auto outputs_x = circ.addMGate(common::utils::GateType::kGenCompaction, input_vectors[0]);
+
+    // How to sort bits:
+    // - compute compaction permutation to sort
+    // - shuffle the permutation and the input using the same order
+    // - reveal the shuffled permutation
+    // - permute shuffled input according to that
+    auto perm_y = circ.addMGate(common::utils::GateType::kGenCompaction, input_vectors[1]);
+    auto shuffled_perm_y = circ.addParamWithOptMGate(common::utils::GateType::kShuffle, perm_y, 0);
+    auto shuffled_y = circ.addParamWithOptMGate(common::utils::GateType::kShuffle, input_vectors[1], 0);
+    auto clear_shuffled_perm_y = circ.addMGate(common::utils::GateType::kReveal, shuffled_perm_y);
+    auto outputs_y = circ.addMDoubleInGate(common::utils::GateType::kReorder, shuffled_y, clear_shuffled_perm_y);
 
     for (auto i : outputs_x) {
         circ.setAsOutput(i);
@@ -54,10 +59,7 @@ std::tuple<common::utils::LevelOrderedCircuit, std::vector<std::vector<common::u
     for (auto i : outputs_y) {
         circ.setAsOutput(i);
     }
-    for (auto i : outputs_z) {
-        circ.setAsOutput(i);
-    }
-    
+
     return {circ.orderGatesByLevel(), input_vectors};
 }
 
@@ -93,26 +95,25 @@ void benchmark(const bpo::variables_map& opts) {
     std::cout << "--- Circuit ---\n";
     std::cout << circ << std::endl;
 
+    int input_bits[7] = {1, 0, 0, 1, 1, 1, 0};
     std::unordered_map<common::utils::wire_t, Ring> input_to_val;
     std::unordered_map<common::utils::wire_t, int> input_to_pid;
-    assert(input_vectors.size() == 3);
-    for (size_t i = 0; i < 3; i++)
+    assert(input_vectors.size() == 2);
+    for (size_t i = 0; i < 2; i++)
         assert(input_vectors[i].size() == vec_size);
-    // Set first vector to 0,1,...
+    // Set first vector to input_bits || input_bits || input_bits || ...
     for (size_t i = 0; i < vec_size; i++)
-        input_to_val[input_vectors[0][i]] = i;
-    // Set second vector to 0,1,...
+        input_to_val[input_vectors[0][i]] = input_bits[i % 7];
+    // Set second vector to input_bits || input_bits || input_bits || ...
     for (size_t i = 0; i < vec_size; i++)
-        input_to_val[input_vectors[1][i]] = i;
-    // Set third vector to 0,2,4,6,...
-    for (size_t i = 0; i < vec_size; i++)
-        input_to_val[input_vectors[2][i]] = i << 1;
+        input_to_val[input_vectors[1][i]] = input_bits[i % 7];
 
-    for (size_t i = 0; i < 3; i++) {
+    for (size_t i = 0; i < 2; i++) {
         for (auto in: input_vectors[i]) {
             input_to_pid[in] = 2;
         }
     }
+    
 
     for (size_t r = 0; r < repeat; ++r) {
         std::cout << "--- Repetition " << r + 1 << " ---" << std::endl;
@@ -145,27 +146,43 @@ void benchmark(const bpo::variables_map& opts) {
             bytes_sent += val.get<int64_t>();
         }
 
+        size_t input_vector_sum = 0;
+        for (size_t i = 0; i < vec_size; i++) {
+            input_vector_sum += input_bits[i % 7];
+        }
         if (pid != 0) {
-            // First vec_size elements should be 0,1,...
-            for (size_t i = 0; i < vec_size; i++)
-                assert(res[i] == i);
-            // Second vector should not be in original order
-            // This could fail if you are really unlucky or the vector is too small
-            bool different = false;
-            for (size_t i = 0; i < vec_size; i++)
-                different = different || (res[vec_size + i] != i);
-            assert(different);
-            // Third vector should be second * 2 as it is shuffled the same way
-            for (size_t i = 0; i < vec_size; i++)
-                assert(res[2 * vec_size + i] == 2 * res[vec_size + i]);
+            // First vec_size elements should be permutation to correctly sort input vector
+            size_t next_0 = 1, next_1 = vec_size - input_vector_sum + 1; // one-indexed
+            for (size_t i = 0; i < vec_size; i++) {
+                if (input_bits[i % 7] == 0) {
+                    assert(res[i] == next_0);
+                    next_0++;
+                } else {
+                    assert(res[i] == next_1);
+                    next_1++;
+                }
+            }
+            // Second vector should be ordered
+            size_t zeros_found = 0;
+            [[maybe_unused]] bool currently_zeros = true;
+            for (size_t i = 0; i < vec_size; i++) {
+                if(res[vec_size + i] == 0) {
+                    assert(currently_zeros);
+                    zeros_found++;
+                } else {
+                    assert(res[vec_size + i] == 1);
+                    currently_zeros = false;
+                }
+            }
+            assert(zeros_found == vec_size - input_vector_sum);
 
-            assert(bytes_sent == 28 * vec_size);
+            assert(bytes_sent == 36 * vec_size);
             assert(bytes_sent_pre == 0);
         } else {
             assert(bytes_sent == 0);
-            assert(bytes_sent_pre - 56 == 40 * vec_size); // 56 always sent to synchronize vector sizes
+            assert(bytes_sent_pre - 56 == 28 * vec_size); // 56 always sent to synchronize vector sizes
         }
-        assert(circ.gates_by_level.size() == 3);
+        assert(circ.gates_by_level.size() == 4);
 
         
         std::cout << "time: " << rbench["time"] << " ms" << std::endl;
@@ -190,7 +207,7 @@ void benchmark(const bpo::variables_map& opts) {
 int main(int argc, char* argv[]) {
     auto prog_opts(bench::programOptions());
     bpo::options_description cmdline(
-      "Benchmark a simple test for unshuffling and unshuffling");
+      "Benchmark a simple test for compation and applying it");
     cmdline.add(prog_opts);
     cmdline.add_options()(
       "config,c", bpo::value<std::string>(),
