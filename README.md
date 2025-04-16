@@ -3,6 +3,8 @@
 This is an end-to-end implementation of Graphiti with the optimizations from MultiCent, also implementing the new centrality measure protocols
 from MultiCent as well as prior reference ones for comparison purposes.
 
+Check out [our paper MultiCent](https://eprint.iacr.org/2025/652) for details!
+
 The protocol is implemented in C++17 and [CMake](https://cmake.org/) is used as the build system.
 It has been tested on Arch Linux (plain and Manjaro Linux) with GCC 14.2.1
 
