@@ -60,22 +60,25 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 make -j8 benchmarks
 cd benchmarks
 
-# Testing that installation successful
+# Testing that installation successful by starting all three parties (with their pids 0, 1, 2)
+# for testing pi_3 with D=2, 10 nodes and a total graph size of 20
 ./pi_3_benchmark --localhost --depth 2 --nodes 10 --size 20 --pid 0 > /dev/null &
 ./pi_3_benchmark --localhost --depth 2 --nodes 10 --size 20 --pid 2 > /dev/null &
 ./pi_3_benchmark --localhost --depth 2 --nodes 10 --size 20 --pid 1
 
 # Running small benchmarks
-./small_LAN_benchmarks.sh # Will take approx. TODO TIME
+./small_LAN_benchmarks.sh # Will take approx. 1 hour
 ./small_WAN_benchmarks.sh # Will take approx. TODO TIME
 
 # Plotting benchmark results
 cd ../../evaluation_scripts
-python3 dataset_plots.py
+python3 dataset_plots.py altScale
 python3 scalability_plots_betterspacing.py altScale
 python3 extended_scalability_plots.py altScale
 python3 network_plots.py altScale
 # Results are written to PDFs inside evaluation_scripts
+# Only run times for smaller graphs are benchmarked and hence plotted to require less RAM,
+# still, communication is analytically computed to show scalability beyond possible benchmarks.
 ```
 
 For plotting original benchmark results our outputting tables with full data, further information can be found [here](#parsing-and-processing-benchmark-data).
@@ -199,7 +202,7 @@ rm -rf p2
 Then, run the LAN benchmarks.
 Our script will automatically enable the network simulation and disable it in the end again.
 We recommend working in the Docker container as this will momentarily change the behavior of your loopback interface.
-Running this script will take approx. TODO TIME.
+Running this script will take approx. 1 hour.
 ```sh
 ./small_LAN_benchmarks.sh
 ```
@@ -247,7 +250,7 @@ All of these scripts draw run time depending on which data points were included 
 Using the [smaller demo benchmarks](#Smaller-Local-Demo-Benchmarks), parts of the plots may hence be missing if the RAM utilization otherwise would be too high.
 Communication is computed analytically according to Table 4 in the paper to show communication even where benchmarks could not be run.
 By calling, e.g., ```python3 scalability_plots_betterspacing.py altScale```, the scale of the plot can be changed from the original used in the paper to whatever fits the actually benchmarked datapoints best.
-```altScale``` is supported for all scripts except for ```python3 dataset_plots.py```.
+```altScale``` is supported for all scripts.
 We recommend using it if the scaling otherwise makes it hard to see the plots.
 
 Furthermore, the data also shown in the tables in Appendix C of the paper can be viewed using:

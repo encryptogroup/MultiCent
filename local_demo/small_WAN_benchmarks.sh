@@ -42,15 +42,15 @@ run_benchmark_ref() {
 for i in 0 1 2; do
 for n in 100 200 300 400 500 600 700 800 900 1000 2000 3000 4000 5000 6000 7000 8000 9000 10000; do
     # OMITTED: 20k, 30k, 40k, 50k
-    run_benchmark pi_3 $n $((11*n)) $i 11_d$i 3
+    run_benchmark pi_3 $n $((11*n)) $i 11_d$i 1
 done
 for n in 100 200 300 400 500 600 700 800 900 1000 2000 3000 4000; do
     # OMITTED: 5k, 6k, 7k, 8k, 9k, 10k, 20k, 30k, 40k, 50k
-    run_benchmark pi_3 $n $((51*n)) $i 51_d$i 3
+    run_benchmark pi_3 $n $((51*n)) $i 51_d$i 1
 done
 for n in 100 200 300 400 500 600 700 800 900 1000 2000; do
     # OMITTED: 3k, 4k, 5k, 6k, 7k, 8k, 9k, 10k, 20k, 30k, 40k, 50k
-    run_benchmark pi_3 $n $((101*n)) $i 101_d$i 3
+    run_benchmark pi_3 $n $((101*n)) $i 101_d$i 1
 done
 done
 
@@ -63,7 +63,7 @@ done
 for i in 1 2; do
 for n in 100 200 300 400 500 600 700 800 900 1000; do
     # OMITTED: 2k, 3k, 4k, 5k, 6k, 7k, 8k
-    run_benchmark_ref pi_3 $n 3 $i d$i 3
+    run_benchmark_ref pi_3 $n 3 $i d$i 1
 done
 done
 

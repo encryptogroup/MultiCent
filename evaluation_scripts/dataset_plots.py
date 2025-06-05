@@ -16,6 +16,8 @@ if len(sys.argv) > 1 and sys.argv[1] == "original":
 else:
     BENCHMARK_DATA_BASE_DIR = "../build/benchmarks"
 
+alt_scale = len(sys.argv) > 1 and sys.argv[1] == "altScale"
+
 def aggregate_row(p0, p1, p2):
     # Aggregates benchmark row for parties p0, p1, p2.
     # Regarding communication, we are interested in the global value, so we compute the sum over all.
@@ -222,30 +224,35 @@ for di in range(5): # rows/datasets: aarhus, london, hiv, arabi, higgs
         # Configure y-axis min and max
         if di == 0:
             # run time:
-            ax[di, 0].set_ylim([0, 0.5])
+            if not alt_scale:
+                ax[di, 0].set_ylim([0, 0.5])
             # traffic:
             ax[di, 1].set_yscale('log')
             y_traffic = [x / 1024 / 1024 for x in y_traffic]
             unit = "MiB"
         elif di == 1:
-            ax[di, 0].set_ylim([0, 3])
+            if not alt_scale:
+                ax[di, 0].set_ylim([0, 3])
             ax[di, 1].set_yscale('log')
             y_traffic = [x / 1024 / 1024 for x in y_traffic]
             unit = "MiB"
         elif di == 2:
-            ax[di, 0].set_ylim([0, 10])
+            if not alt_scale:
+                ax[di, 0].set_ylim([0, 10])
             ax[di, 1].set_ylim([5, 1000])
             ax[di, 1].set_yscale('log')
             y_traffic = [x / 1024 / 1024 for x in y_traffic]
             unit = "MiB"
         elif di == 3:
-            ax[di, 0].set_ylim([0, 3])
+            if not alt_scale:
+                ax[di, 0].set_ylim([0, 3])
             ax[di, 1].set_ylim([0.05, 50])
             ax[di, 1].set_yscale('log')
             y_traffic = [x / 1024 / 1024 / 1024 for x in y_traffic]
             unit = "GiB"
         elif di == 4:
-            ax[di, 0].set_ylim([0, 150])
+            if not alt_scale:
+                ax[di, 0].set_ylim([0, 150])
             ax[di, 1].set_ylim([3, 50000])
             ax[di, 1].set_yscale('log')
             y_traffic = [x / 1024 / 1024 / 1024 for x in y_traffic]
