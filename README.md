@@ -34,14 +34,14 @@ We also translate the protocols from [the prior work](https://doi.org/10.1145/30
 
 # Table of Contents
 
-* [TL;DR](:tl-dr): Quick walkthrough, demonstrating how to run benchmarks on smaller graph instances, plot them, etc.
-* [Environment](:environment): Setting up the environment to compile and run MultiCent, either using Docker or standalone
-* [Compiling](:compiling): Compiling MultiCent
-* [Running the Protocols](:running-the-protocols): Guide to run individual protocols
-* [Reproducing our Benchmarks](:reproducing-our-benchmarks): Guide to reproduce benchmarks as done in the paper
-* [Parsing and Processing Benchmark Data](:parsing-and-processing-benchmark-data): Guide to parse and display benchmark data as plot and tables
-* [Running Tests](:running-tests): Guide on running test cases
-* [Repository Content](:repository-content): Outline of which code parts to find where
+* [TL;DR](#tl-dr): Quick walkthrough, demonstrating how to run benchmarks on smaller graph instances, plot them, etc.
+* [Environment](#environment): Setting up the environment to compile and run MultiCent, either using Docker or standalone
+* [Compiling](#compiling): Compiling MultiCent
+* [Running the Protocols](#running-the-protocols): Guide to run individual protocols
+* [Reproducing our Benchmarks](#reproducing-our-benchmarks): Guide to reproduce benchmarks as done in the paper
+* [Parsing and Processing Benchmark Data](#parsing-and-processing-benchmark-data): Guide to parse and display benchmark data as plot and tables
+* [Running Tests](#running-tests): Guide on running test cases
+* [Repository Content](#repository-content): Outline of which code parts to find where
 
 
 # TL;DR
@@ -78,8 +78,8 @@ python3 network_plots.py altScale
 # Results are written to PDFs inside evaluation_scripts
 ```
 
-For plotting original benchmark results our outputting tables with full data, further information can be found [here](:parsing-and-processing-benchmark-data).
-If you wish to run tests, go [here](:running-tests).
+For plotting original benchmark results our outputting tables with full data, further information can be found [here](#parsing-and-processing-benchmark-data).
+If you wish to run tests, go [here](#running-tests).
 
 
 # Environment
@@ -231,7 +231,7 @@ Hence, the first line of each script needs to be removed before running the full
 # Parsing and Processing Benchmark Data
 
 Running the benchmarks will create and populate directories p0, p1, p2 inside of build/benchmarks.
-If you run local benchmarking as documented [here](:Smaller-Local-Demo-Benchmarks), these should afterwards all exist.
+If you run local benchmarking as documented [here](#Smaller-Local-Demo-Benchmarks), these should afterwards all exist.
 If you run different parties on different machines, you have to collect these directories inside build/benchmarks of one of the machines first from which you then also follow the next steps.
 
 Navigate into directory evaluation_scripts.
@@ -244,7 +244,7 @@ The plots are generated as follows:
 - ```python3 network_plots.py``` will draw the plots from Fig. 21 (Appendix C) of the paper, comparing LAN to WAN performance.
 If used from within the Docker container, the plots will not be displayed, but anyway written to a pdf in the same directory which can then be opened from the host system.
 All of these scripts draw run time depending on which data points were included in the benchmarks.
-Using the [smaller demo benchmarks](:Smaller-Local-Demo-Benchmarks), parts of the plots may hence be missing if the RAM utilization otherwise would be too high.
+Using the [smaller demo benchmarks](#Smaller-Local-Demo-Benchmarks), parts of the plots may hence be missing if the RAM utilization otherwise would be too high.
 Communication is computed analytically according to Table 4 in the paper to show communication even where benchmarks could not be run.
 By calling, e.g., ```python3 scalability_plots_betterspacing.py altScale```, the scale of the plot can be changed from the original used in the paper to whatever fits the actually benchmarked datapoints best.
 ```altScale``` is supported for all scripts except for ```python3 dataset_plots.py```.
@@ -265,7 +265,7 @@ This data is the output of our original benchmarks that all reported benchmarkin
 
 # Running Tests
 
-To run tests, first [recompile](:Compiling) for debug mode.
+To run tests, first [recompile](#Compiling) for debug mode.
 Then, navigate to build/benchmarks and run
 ```sh
 ./run_test.sh [id]
