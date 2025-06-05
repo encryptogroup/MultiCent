@@ -34,7 +34,7 @@ We also translate the protocols from [the prior work](https://doi.org/10.1145/30
 
 # Table of Contents
 
-* [TL;DR](#tl-dr): Quick walkthrough, demonstrating how to run benchmarks on smaller graph instances, plot them, etc.
+* [TL;DR](#tldr): Quick walkthrough, demonstrating how to run benchmarks on smaller graph instances, plot them, etc.
 * [Environment](#environment): Setting up the environment to compile and run MultiCent, either using Docker or standalone
 * [Compiling](#compiling): Compiling MultiCent
 * [Running the Protocols](#running-the-protocols): Guide to run individual protocols
