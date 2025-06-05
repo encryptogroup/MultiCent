@@ -50,7 +50,7 @@ This section provides a brief walkthrough, installing MultiCent inside a Docker 
 You should have 12 GB RAM available for that to ensure that no benchmarks run out of memory.
 ```sh
 # Setting up and running container
-sudo docker buildx build -t multicent .
+sudo docker buildx build -t multicent . # See Environment Section below for alternative that imports an already built image
 sudo docker run -it -v $(pwd):$(pwd) -w $(pwd) --cap-add=NET_ADMIN multicent
 # Proceed working inside the container...
 
