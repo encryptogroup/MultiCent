@@ -93,10 +93,19 @@ Please note that our benchmarks were conducted using the standalone method, runn
 ## Using Docker
 
 We provide a Dockerfile to set up the environment in a more simple manner.
-Run the following command to build the image:
+
+Run the following command to build the image yourself:
 ```sh
 sudo docker buildx build -t multicent .
 ```
+
+Alternatively, you can also download the image from the latest release's assets on the [GitHub releases page](https://github.com/encryptogroup/MultiCent/releases).
+Load this image as follows from the directory where you downloaded it to:
+```sh
+sudo docker load < [IMAGE_FILE_NAME].tar.gz 
+```
+Then, make sure to go back to the main directory of the downloaded repository.
+
 Then, run the image as follows (```--cap-add=NET_ADMIN``` is required for emulating realistic network behavior later):
 ```sh
 sudo docker run -it -v $(pwd):$(pwd) -w $(pwd) --cap-add=NET_ADMIN multicent
