@@ -1,2 +1,3 @@
 build/
 .vscode/
+evaluation_scripts/*.pdf
