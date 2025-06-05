@@ -727,7 +727,7 @@ void OfflineEvaluator::setWireMasks(
       std::vector<Ring> data_send_i;
       data_send_i.reserve(100000000);
       for(int j = 0; j<100000000; j++){
-        data_send_i[j] = offline_arith_comm[i*100000000 + j];   
+        data_send_i.push_back(offline_arith_comm[i*100000000 + j]);   
       }
 
       network_->send(2, data_send_i.data(), sizeof(Ring) * 100000000);
@@ -736,7 +736,7 @@ void OfflineEvaluator::setWireMasks(
     std::vector<Ring> data_send_last;
     data_send_last.reserve(last_comm);
     for(int j = 0; j<last_comm; j++){
-      data_send_last[j] = offline_arith_comm[num_comm*100000000 + j];
+      data_send_last.push_back(offline_arith_comm[num_comm*100000000 + j]);
     }
     network_->send(2, data_send_last.data(), sizeof(Ring) * last_comm);
     // network_->send(2, offline_arith_comm.data(), sizeof(Ring) * arith_comm);
@@ -747,7 +747,7 @@ void OfflineEvaluator::setWireMasks(
       std::vector<Ring> data_send_i;
       data_send_i.reserve(100000000);
       for(int j = 0; j<100000000; j++){
-        data_send_i[j] = offline_arith_comm_to_1[i*100000000 + j];   
+        data_send_i.push_back(offline_arith_comm_to_1[i*100000000 + j]);   
       }
 
       network_->send(1, data_send_i.data(), sizeof(Ring) * 100000000);
@@ -756,7 +756,7 @@ void OfflineEvaluator::setWireMasks(
     std::vector<Ring> data_send_last_to_1;
     data_send_last_to_1.reserve(last_comm);
     for(int j = 0; j<last_comm; j++){
-      data_send_last_to_1[j] = offline_arith_comm_to_1[num_comm*100000000 + j];
+      data_send_last_to_1.push_back(offline_arith_comm_to_1[num_comm*100000000 + j]);
     }
     network_->send(1, data_send_last_to_1.data(), sizeof(Ring) * last_comm);
     // network_->send(1, offline_arith_comm_to_1.data(), sizeof(Ring) * arith_comm_to_1);

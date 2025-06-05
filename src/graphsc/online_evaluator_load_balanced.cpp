@@ -900,7 +900,7 @@ namespace graphsc
                        std::vector<Ring> data_send_i;
                        data_send_i.reserve(seg_factor);
                        for(int j = 0; j<seg_factor; j++){
-                            data_send_i[j] = data_send[i*seg_factor + j];   
+                            data_send_i.push_back(data_send[i*seg_factor + j]);   
                        }
 
                        network_->send(2, data_send_i.data(), sizeof(Ring) * seg_factor);
@@ -917,7 +917,7 @@ namespace graphsc
                     std::vector<Ring> data_send_last;
                     data_send_last.reserve(last_comm);
                     for(int j = 0; j<last_comm; j++){
-                        data_send_last[j] = data_send[num_comm*seg_factor + j];
+                        data_send_last.push_back(data_send[num_comm*seg_factor + j]);
                     }
                     network_->send(2, data_send_last.data(), sizeof(Ring) * last_comm);
                     std::vector<Ring> data_recv_last(last_comm);
@@ -935,7 +935,7 @@ namespace graphsc
                        std::vector<Ring> data_send_i;
                        data_send_i.reserve(seg_factor);
                        for(int j = 0; j<seg_factor; j++){
-                            data_send_i[j] = data_send[i*seg_factor + j];
+                            data_send_i.push_back(data_send[i*seg_factor + j]);
                        }
 
                        network_->send(1, data_send_i.data(), sizeof(Ring) * seg_factor);
@@ -951,7 +951,7 @@ namespace graphsc
                     std::vector<Ring> data_send_last;
                     data_send_last.reserve(last_comm);
                     for(int j = 0; j<last_comm; j++){
-                        data_send_last[j] = data_send[num_comm*seg_factor + j];
+                        data_send_last.push_back(data_send[num_comm*seg_factor + j]);
                     }
                     network_->send(1, data_send_last.data(), sizeof(Ring) * last_comm);
                     std::vector<Ring> data_recv_last(last_comm);
