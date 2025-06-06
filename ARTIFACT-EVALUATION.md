@@ -4,7 +4,7 @@ Paper title: **MultiCent: Secure and Scalable Computation of Centrality Measures
 
 Artifacts HotCRP Id: **#TODO** (not your paper Id, but the artifacts id)
 
-Requested Badge: **Reproduced**
+Requested Badge: all: **Reproduced**, **Functional**, **Available**
 
 ## Description
 This artifact is the implementation of the protocols in the paper, used for running benchmarks for these protocols.
@@ -20,14 +20,16 @@ The software is only tested on x86_64 architecture.
 For accurate benchmark results, a CPU with at least 4 cores should be used.
 Main bottleneck is RAM, we provide scaled down benchmarks that should run on a machine with 16GB RAM (we need up to 12GB free inside a Docker container).
 As the original benchmarks were done distributed with a total of >300GB RAM, the full benchmarks for all input sizes will likely not be feasible.
-Yet, the more RAM the reviewer has, the better we can reproduce our benchmarks.
-Please let us know how much free RAM can be used and we are happy to provide additional benchmark scripts doing all benchmarks possible within this constraint.
+We think that the scaled down benchmarks suffice to verify our improvement and scalability claims sufficiently, but should more benchmarks
+for larger graphs be requested, please let us know how much free RAM is available and we are happy to provide additional benchmark scripts doing all benchmarks possible within this updated constraint.
+For more information on the exact RAM use (per one of the three parties), we refer to Appendix C of the paper.
+More information can also be found at the end of this document under *Limitations*.
 Our benchmarks take less than 2 hours in their current state.
 If we scale them up again for more RAM, they will also take more time, but this strongly depends on how much RAM exactly is available.
 Required disk space is at most a couple GB, mostly for a Docker image.
 
 ### Hardware Requirements
-No special hardware is required. RAM requirements see above.
+No special hardware is required, yet, an x86_64 should be used. RAM requirements see above.
 
 ### Software Requirements
 We provide a Docker image in which our code can be run.
@@ -35,6 +37,7 @@ We provide a Docker image in which our code can be run.
 ### Estimated Time and Storage Consumption
 RAM requirements see above under Basic Requirements.
 Our small LAN benchmarks run in approx 1 hour and the small WAN benchmarks in approx 40 minutes.
+Should larger benchmarks be requested (see above), time would of course increase.
 Disk space beyond for installing the Docker image is negligible.
 
 ## Environment
@@ -50,6 +53,7 @@ TODO update to release etc and container image
 Docker (including docker-buildx) and git need to be available on the host system.
 Note that for setting up the container, you have to pick one of the choices presented in the script below:
 Either build the container yourself, or download the image provided as a release asset on GitHub and simply load it.
+The image was build on x86_64 and *should* work on most common and sufficiently modern CPUs of that architecture.
 ```sh
 git clone git@github.com:encryptogroup/MultiCent.git 
 cd MultiCent
@@ -68,7 +72,7 @@ sudo docker run -it -v $(pwd):$(pwd) -w $(pwd) --cap-add=NET_ADMIN multicent
 mkdir build && cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
 make -j8 benchmarks
-cd benchmarks
+cd benchmarks # Not cd benchmark (without the s)!
 ```
 
 ### Testing the Environment (Only for Functional and Reproduced badges)
@@ -96,14 +100,14 @@ sent: 5880 bytes
 peak_resident_set_size: 11392
 peak_virtual_memory: 912068
 ```
-This indicates that party 1 has sent 0 bytes during setup/preprocessing which took 2.320152 ms,
+Following is the interpretation of this output, but note that this is not important for the later benchmarks as the data is also written to files that
+can later be parsed and visualized with Python scripts procided by us.
+The output indicates that party 1 has sent 0 bytes during setup/preprocessing which took 2.320152 ms,
 while it has sent 5880 bytes in the online phase that took 1.620136 ms.
 Peak virtual memory was at 912068 KB while the peak resident set size was 11392 KB.
 Of course, the memory utilization in the overall statistics and the measured time can vary and hence be different, but traffic is expected to always be the same.
 
 ## Artifact Evaluation (Only for Functional and Reproduced badges)
-This section includes all the steps required to evaluate your artifact's functionality and validate your paper's key results and claims.
-Therefore, highlight your paper's main results and claims in the first subsection. And describe the experiments that support your claims in the subsection after that.
 
 ### Main Results and Claims
 MultiCent provides scalable and secure computation of centrality measures w.r.t. graph size and depth.
@@ -126,8 +130,8 @@ We originally benchmarked on three machines with 128 GB RAM each, exhausting nea
 Note that our Docker setup runs all three parties on the same machine, essentially tripling the local RAM requirements.
 Hence, the domain of graph sizes we can run the benchmarks on critically depends on the available RAM.
 We provide scripts for running experiments using at most 12 GB of RAM.
-Furthermore, we kindly ask the artifact reviewer how much available RAM they have.
-We are happy to then provide additional benchmark scripts doing all benchmarks possible within this constraint, allowing to reproduce the experiments on larger graphs too, confirming that scalability proceeds as to be expected from the smaller benchmarks.
+We think that this is sufficient to verify our claims, but should this not be the case, we kindly ask the artifact reviewer how much available RAM they have.
+We are happy to then provide additional benchmark scripts doing all benchmarks possible within this constraint, allowing to reproduce the experiments on larger graphs too, confirming that scalability indeed proceeds as to be expected from the smaller benchmarks.
 
 **Note regarding considered datasets**:
 Note that our MPC protocols are parametrized by the number of nodes and total graph size only.
@@ -135,11 +139,13 @@ They are oblivious of the exact graph structure which must not be leaked by the 
 Hence, it is not required to provide actual graph instances as input, any graph with the same parameters will lead to the same performance.
 For the datasets in Table 2 of the paper, we simply generate a synthetic graph with the same dimensions.
 For undirected graphs, for each edge {v,w} we insert directed edges (v,w) and (w,v), doubling the number of edges.
+This is only for benchmarking purposes; our code of course also supports providing customized graphs as inputs, as can be seen,
+e.g., [here](benchmark/pi_3_test.cpp), starting at line 102, for a small graph instance example.
 
 #### Experiment 1: LAN Benchmarks
 Most benchmarks in our paper are done in a LAN setting (Fig. 7, 8, 9, (in Appendix C:) Table 5, 6, 7, 9, 10).
 The following will do LAN benchmarks for all of our protocols as well as the reference from Asharov et al.
-They can be started as follows, assuming one is still in the docker container and inside the build/benchmarks directory:
+They can be started as follows, assuming one is still in the docker container and inside the **build/benchmarks** directory:
 ```sh
 ./small_LAN_benchmarks.sh
 ```
@@ -150,6 +156,7 @@ If this script is interrupted at some point, all obtained benchmark data should 
 Otherwise, problems might occur later when trying to parse the benchmark data.
 
 For easy parsing and processing, we provide scripts.
+They assume that the aforementioned benchmarks were executed completely, if this is not the case, you may get a missing file error.
 Proceed as follows:
 ```sh
 cd ../../evaluation_scripts
@@ -189,7 +196,7 @@ Appendix C also contains WAN benchmarks for pi_M, comparing to the LAN benchmark
 This is connected to Fig. 21 and Table 8 in the paper.
 
 The following assumes that the LAN benchmarks from Experiment 1 were already done and the generated benchmark data kept as it is also used here.
-First, navigate to build/benchmarks in the docker container.
+First, **navigate to build/benchmarks** in the docker container.
 Then, start the WAN benchmarks as follows:
 ```sh
 ./small_WAN_benchmarks.sh
@@ -203,6 +210,7 @@ An alternative is to just delete all files within the directories that are prefi
 Otherwise, problems might occur later when trying to parse the benchmark data.
 
 For easy parsing and processing, we again provide scripts.
+They assume that the aforementioned benchmarks were executed completely, if this is not the case, you may get a missing file error.
 Proceed as follows:
 ```sh
 cd ../../evaluation_scripts
@@ -220,7 +228,7 @@ python3 analyze.py scalability_pi3_WAN
 The results should match the data provided by the plot and table in the paper for the graph sizes where benchmarks were possible.
 Still, yet again the exact hardware and other environment factors may slightly influence the run times and allocated RAM; this should not obstruct verifying the claims.
 Also, we decreased the number of iterations per data point to 1 here.
-Regarding the reference protocol, note that while one-time cost now is lower where it is able to run (as it requires no communication), this will be overshadowed by the deficits in cost.
+Regarding the reference protocol, note that while one-time cost now is lower where it is able to run (as it requires no communication), this will be overshadowed by the deficits in cost per iteration.
 
 We also provide the full outputs of our original benchmark runs using three machines inside evaluation_scripts/raw_benchmark_outputs.
 These can also be parsed and visualized, using the python scripts as above, but discarding of the ```altScale``` flag where used and instead using an ```original``` flag, e.g.,
@@ -232,12 +240,12 @@ python3 network_plots.py original
 To test the correctness of our code, we provide some test cases.
 If needed, these can be started as follows:
 
-First, navigate to the build directory from within the Docker container.
+First, navigate to the **build directory** from within the Docker container.
 Then, recompile in debug mode so that assertions become active:
 ```sh
 cmake -DCMAKE_BUILD_TYPE=Debug ..
 make -j8 benchmarks
-cd benchmarks
+cd benchmarks # Not cd benchmark (without the s)!
 ```
 Now, run
 ```sh

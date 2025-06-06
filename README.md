@@ -58,7 +58,7 @@ sudo docker run -it -v $(pwd):$(pwd) -w $(pwd) --cap-add=NET_ADMIN multicent
 mkdir build && cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
 make -j8 benchmarks
-cd benchmarks
+cd benchmarks # Not cd benchmark (without the s)!
 
 # Testing that installation successful by starting all three parties (with their pids 0, 1, 2)
 # for testing pi_3 with D=2, 10 nodes and a total graph size of 20
@@ -100,6 +100,7 @@ sudo docker buildx build -t multicent .
 ```
 
 Alternatively, you can also download the image from the latest release's assets on the [GitHub releases page](https://github.com/encryptogroup/MultiCent/releases).
+This specific build of course is architecture specific. It was build on x86_64 and *should* work on most common and sufficiently modern CPUs of that architecture.
 Load this image as follows from the directory where you downloaded it to:
 ```sh
 sudo docker load < [IMAGE_FILE_NAME].tar.gz 
@@ -190,6 +191,8 @@ They are oblivious of the exact graph structure which must not be leaked by the 
 Hence, it is not required to provide actual graph instances as input, any graph with the same parameters will lead to the same performance.
 For the datasets in Table 2 of the paper, we simply generate a synthetic graph with the same dimensions.
 For undirected graphs, for each edge {v,w} we insert directed edges (v,w) and (w,v), doubling the number of edges.
+This is only for benchmarking purposes; our code of course also supports providing customized graphs as inputs, as can be seen,
+e.g., [here](benchmark/pi_3_test.cpp), starting at line 102, for a small graph instance example.
 
 ## Smaller Local Demo Benchmarks
 
@@ -210,6 +213,7 @@ rm -rf p2
 
 Then, run the LAN benchmarks.
 Our script will automatically enable the network simulation and disable it in the end again.
+If you terminate the script early, simply run ```./network_off.sh``` to stop the artificial network simulation again.
 We recommend working in the Docker container as this will momentarily change the behavior of your loopback interface.
 Running this script will take approx. 1 hour.
 ```sh
@@ -248,6 +252,7 @@ If you run different parties on different machines, you have to collect these di
 
 Navigate into directory evaluation_scripts.
 This contains multiple python scripts intended to parse and process the generated benchmark data, aggregating over the numbers collected by each individual party.
+They assume that each of the displayed benchmarks have been executed at least to some degree, if this is not the case, you may get a missing file error.
 
 The plots are generated as follows:
 - ```python3 dataset_plots.py``` will draw the plots from Fig. 7 of the paper, displaying efficiency for different values D and different datasets.
@@ -283,6 +288,7 @@ Then, navigate to build/benchmarks and run
 ./run_test.sh [id]
 ```
 Depending on the value of [id], this will run one of the following tests (0-5 are for building blocks):
+
 0. test: Small test circuit with *, +, XOR, AND gates; test for correct output and communication
 1. shuffle: Test shuffle implementation for vectors of size 10, test for correct output and communication
 2. doubleshuffle: Test modified 'doubleshuffle' implementation for vectors of size 10, test for correct output and communication
@@ -316,7 +322,7 @@ Depending on the value of [id], this will run one of the following tests (0-5 ar
 
 Note that the overall structure of the repository stems from the structure of [Graphiti](https://github.com/Bhavishrg/Graphiti).
 In the following, we briefly outline which essential parts of MultiCent implementation can be found where: 
-* benchmark/subcircuits.h and benchmark/subcircuits.cpp generate the circuits for all centrality measures. **Here, it can be found how our different high-level protocols such as computation of centrality measures, sorting, etc. are composed of low-level atomic building blocks such as shuffling, multiplications, etc.**
-* benchmark contains all benchmarks and test cases. Hence, it also demonstrates how our protocols can be instantiated and used. The benchmarks essentially define the inputs and parameters for the circuit and then let benchmark/subcircuits.cpp generate the circuit itself.
-* src/graphsc/offline_evaluator.cpp contains the preprocessing for all atomic building blocks. In contrast to Graphiti, building blocks such as shuffling are fixed here and further building blocks like double shuffling etc. are introduced.
-* src/graphsc/offline_evaluator.cpp contains the online phase for all atomic building blocks. In contrast to Graphiti, building blocks such as shuffling are fixed here and further building blocks like double shuffling and more efficient propagation etc. are introduced.
+* [benchmark/subcircuits.h](benchmark/subcircuits.h) and [benchmark/subcircuits.cpp](benchmark/subcircuits.cpp) generate the circuits for all centrality measures. **Here, it can be found how our different high-level protocols such as computation of centrality measures, sorting, etc. are composed of low-level atomic building blocks such as shuffling, multiplications, etc.**
+* benchmark contains all benchmarks and test cases. Hence, it also demonstrates how our protocols can be instantiated and used. The benchmarks essentially define the inputs and parameters for the circuit and then let [benchmark/subcircuits.cpp](benchmark/subcircuits.cpp) generate the circuit itself.
+* [src/graphsc/offline_evaluator.cpp](src/graphsc/offline_evaluator.cpp) contains the preprocessing for all atomic building blocks. In contrast to Graphiti, building blocks such as shuffling are fixed here and further building blocks like double shuffling etc. are introduced.
+* [src/graphsc/online_evaluator_load_balanced.cpp](src/graphsc/online_evaluator_load_balanced.cpp) contains the online phase for all atomic building blocks. In contrast to Graphiti, building blocks such as shuffling are fixed here and further building blocks like double shuffling and more efficient propagation etc. are introduced.
