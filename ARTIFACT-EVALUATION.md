@@ -2,7 +2,7 @@
 
 Paper title: **MultiCent: Secure and Scalable Computation of Centrality Measures on Multilayer Graphs**
 
-Artifacts HotCRP Id: **#TODO** (not your paper Id, but the artifacts id)
+Artifacts HotCRP Id: **#11**
 
 Requested Badge: all: **Reproduced**, **Functional**, **Available**
 
@@ -46,24 +46,26 @@ Everything will work inside a docker container.
 Hence, only git and docker (including docker-buildx) need to be available to access and use the artifact.
 
 ### Accessibility (All badges)
-TODO link to commit or release
+Repository publicly available on GitHub: [https://github.com/encryptogroup/MultiCent](https://github.com/encryptogroup/MultiCent).
+Specifically, the version to review is [release v0.1.0](https://github.com/encryptogroup/MultiCent/releases/tag/v0.1.0) which,
+as an asset, also comes with a ready-to-use docker image.
 
 ### Set up the environment (Only for Functional and Reproduced badges)
-TODO update to release etc and container image
 Docker (including docker-buildx) and git need to be available on the host system.
 Note that for setting up the container, you have to pick one of the choices presented in the script below:
-Either build the container yourself, or download the image provided as a release asset on GitHub and simply load it.
+Either build the container yourself, or download the [image provided as a release asset on GitHub](https://github.com/encryptogroup/MultiCent/releases/download/v0.1.0/multicent_image.tar.gz) and simply load it.
 The image was build on x86_64 and *should* work on most common and sufficiently modern CPUs of that architecture.
 ```sh
 git clone git@github.com:encryptogroup/MultiCent.git 
 cd MultiCent
+git checkout v0.1.0
 
 # Setting up and running container:
 
 # Either build docker image yourself from the provided dockerfile:
 sudo docker buildx build -t multicent .
 # Or download prepared image from the release assets on GitHub to the MultiCent directory and load it:
-sudo docker load < [IMAGE_FILE_NAME].tar.gz 
+sudo docker load < multicent_image.tar.gz 
 
 sudo docker run -it -v $(pwd):$(pwd) -w $(pwd) --cap-add=NET_ADMIN multicent
 # Proceed working inside the container...
