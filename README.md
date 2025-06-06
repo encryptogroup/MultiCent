@@ -68,7 +68,7 @@ cd benchmarks
 
 # Running small benchmarks
 ./small_LAN_benchmarks.sh # Will take approx. 1 hour
-./small_WAN_benchmarks.sh # Will take approx. TODO TIME
+./small_WAN_benchmarks.sh # Will take approx. 40 minutes
 
 # Plotting benchmark results
 cd ../../evaluation_scripts
@@ -217,7 +217,7 @@ Running this script will take approx. 1 hour.
 ```
 After the LAN benchmarks finished, you can proceed with the WAN benchmarks.
 Do **not** delete build/benchmarks/p0 etc. if previously generated from the LAN benchmarks.
-Running this script will take approx. TODO TIME.
+Running this script will take approx. 40 minutes.
 ```sh
 ./small_WAN_benchmarks.sh
 ```

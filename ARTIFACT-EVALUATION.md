@@ -22,7 +22,8 @@ Main bottleneck is RAM, we provide scaled down benchmarks that should run on a m
 As the original benchmarks were done distributed with a total of >300GB RAM, the full benchmarks for all input sizes will likely not be feasible.
 Yet, the more RAM the reviewer has, the better we can reproduce our benchmarks.
 Please let us know how much free RAM can be used and we are happy to provide additional benchmark scripts doing all benchmarks possible within this constraint.
-TODO TIME
+Our benchmarks take less than 2 hours in their current state.
+If we scale them up again for more RAM, they will also take more time, but this strongly depends on how much RAM exactly is available.
 Required disk space is at most a couple GB, mostly for a Docker image.
 
 ### Hardware Requirements
@@ -33,7 +34,7 @@ We provide a Docker image in which our code can be run.
 
 ### Estimated Time and Storage Consumption
 RAM requirements see above under Basic Requirements.
-Our small LAN benchmarks run in approx 1 hour and the small WAN benchmarks in approx TODO TIME.
+Our small LAN benchmarks run in approx 1 hour and the small WAN benchmarks in approx 40 minutes.
 Disk space beyond for installing the Docker image is negligible.
 
 ## Environment
@@ -168,6 +169,8 @@ Furthermore, the verbose data as provided in Appendix C, Table 5, 6, 7, 9, 10, c
 - ```python3 analyze.py scalability_pi1```: Data from Table 10
 
 The results should match the data provided by the plots and tables in the paper for the graph sizes where benchmarks were possible.
+Regarding the comparison to the reference protocol from the prior work (pi_M and pi_K), while its one-time cost might not be the highest among all datarows using the limited, smaller benchmarks, it should clearly be visible how it is scaling quadratically with |V|.
+Hence, it can be extrapolated how this will become the highest for higher |V| as also depicted in the paper for larger graphs.
 Still, the exact hardware and other environment factors may slightly influence the run times; this should not obstruct verifying the claims.
 We also note that there might be fluctuations regarding allocated RAM, especially for smaller sizes, and for cost per iteration data if significantly smaller than the one-time cost.
 This is caused by cost per iteration being deducted from the difference between runs with more and less iterations so that fluctuations of the one-time cost may yield deviations of measured per iteration cost.
@@ -183,7 +186,6 @@ python3 analyze.py scalability_pi2 original
 
 #### Experiment 2: WAN Benchmarks
 Appendix C also contains WAN benchmarks for pi_M, comparing to the LAN benchmarks, to attest that the prior scalability results also generalize to slower networks, being slowed down by some factor due to lower network performance.
-In particular, it also demonstrates that we too outperform the reference protocol from Asharov et al. in the WAN setting.
 This is connected to Fig. 21 and Table 8 in the paper.
 
 The following assumes that the LAN benchmarks from Experiment 1 were already done and the generated benchmark data kept as it is also used here.
@@ -192,7 +194,7 @@ Then, start the WAN benchmarks as follows:
 ```sh
 ./small_WAN_benchmarks.sh
 ```
-Note that this will take approx TODO TIME while consuming negligible additional disk space.
+Note that this will take approx 40 minutes while consuming negligible additional disk space.
 Shell outputs show that the benchmarks still are running, but can otherwise be ignored as all relevant data is also saved to files.
 
 If this script is interrupted at some point, all obtained benchmark data should be removed (by deleting directories p0, p1, p2 inside build/benchmarks) before restarting the script.
@@ -218,6 +220,7 @@ python3 analyze.py scalability_pi3_WAN
 The results should match the data provided by the plot and table in the paper for the graph sizes where benchmarks were possible.
 Still, yet again the exact hardware and other environment factors may slightly influence the run times and allocated RAM; this should not obstruct verifying the claims.
 Also, we decreased the number of iterations per data point to 1 here.
+Regarding the reference protocol, note that while one-time cost now is lower where it is able to run (as it requires no communication), this will be overshadowed by the deficits in cost.
 
 We also provide the full outputs of our original benchmark runs using three machines inside evaluation_scripts/raw_benchmark_outputs.
 These can also be parsed and visualized, using the python scripts as above, but discarding of the ```altScale``` flag where used and instead using an ```original``` flag, e.g.,
@@ -263,6 +266,7 @@ Above, it has been documented how to easily load this data using our provided sc
 
 Finally, should the artifact reviewer like to benchmark on larger graphs, we kindly ask them how much available RAM they have.
 We are happy to then provide additional benchmark scripts doing all benchmarks possible within this constraint, allowing to reproduce the experiments on larger graphs too, confirming that scalability proceeds as to be expected from the smaller benchmarks.
+Note that this will also consume more time.
 
 
 ## Notes on Reusability (Only for Functional and Reproduced badges)
