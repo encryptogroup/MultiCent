@@ -20,8 +20,8 @@ The software is only tested on x86_64 architecture.
 For accurate benchmark results, a CPU with at least 4 cores should be used.
 Main bottleneck is RAM, we provide scaled down benchmarks that should run on a machine with 16GB RAM (we need up to 12GB free inside a Docker container).
 As the original benchmarks were done distributed with a total of >300GB RAM, the full benchmarks for all input sizes will likely not be feasible.
-We think that the scaled down benchmarks suffice to verify our improvement and scalability claims sufficiently, but should more benchmarks
-for larger graphs be requested, please let us know how much free RAM is available and we are happy to provide additional benchmark scripts doing all benchmarks possible within this updated constraint.
+We think that the scaled down benchmarks suffice to verify our improvement and scalability claims sufficiently.
+Anyhow, the benchmark scripts can always be extended to larger graph instances within given actual RAM constraints.
 For more information on the exact RAM use (per one of the three parties), we refer to Appendix C of the paper.
 More information can also be found at the end of this document under *Limitations*.
 Our benchmarks take less than 2 hours in their current state.
@@ -132,8 +132,7 @@ We originally benchmarked on three machines with 128 GB RAM each, exhausting nea
 Note that our Docker setup runs all three parties on the same machine, essentially tripling the local RAM requirements.
 Hence, the domain of graph sizes we can run the benchmarks on critically depends on the available RAM.
 We provide scripts for running experiments using at most 12 GB of RAM.
-We think that this is sufficient to verify our claims, but should this not be the case, we kindly ask the artifact reviewer how much available RAM they have.
-We are happy to then provide additional benchmark scripts doing all benchmarks possible within this constraint, allowing to reproduce the experiments on larger graphs too, confirming that scalability indeed proceeds as to be expected from the smaller benchmarks.
+We think that this is sufficient to verify our claims, but should this not be the case, it is possible to extend the benchmark scripts by larger graphs, confirming that scalability indeed proceeds as to be expected from the smaller benchmarks.
 
 **Note regarding considered datasets**:
 Note that our MPC protocols are parametrized by the number of nodes and total graph size only.
@@ -154,7 +153,7 @@ They can be started as follows, assuming one is still in the docker container an
 Note that this will take approx 1 hour while consuming negligible additional disk space.
 Shell outputs show that the benchmarks still are running, but can otherwise be ignored as all relevant data is also saved to files.
 
-If this script is interrupted at some point, all obtained benchmark data should be removed (by deleting directories p0, p1, p2 inside build/benchmarks) before restarting the script.
+If this script is used a second time, e.g., due to being interrupted in the first run, all benchmark results from the prior run will be automatically deleted to ensure that no duplicate data points occur.
 Otherwise, problems might occur later when trying to parse the benchmark data.
 
 For easy parsing and processing, we provide scripts.
@@ -206,9 +205,7 @@ Then, start the WAN benchmarks as follows:
 Note that this will take approx 40 minutes while consuming negligible additional disk space.
 Shell outputs show that the benchmarks still are running, but can otherwise be ignored as all relevant data is also saved to files.
 
-If this script is interrupted at some point, all obtained benchmark data should be removed (by deleting directories p0, p1, p2 inside build/benchmarks) before restarting the script.
-Note that this would also require to run the LAN benchmarks again.
-An alternative is to just delete all files within the directories that are prefixed by 'WAN_'
+If this script is used a second time, e.g., due to being interrupted in the first run, all benchmark results from the prior run (for WAN) will be automatically deleted to ensure that no duplicate data points occur.
 Otherwise, problems might occur later when trying to parse the benchmark data.
 
 For easy parsing and processing, we again provide scripts.
@@ -274,8 +271,7 @@ We argue that even for reduced graph sizes in the resulting benchmarks, the same
 Furthermore, we provide all original benchmark outputs by our benchmark runs inside evaluation_scripts/raw_benchmark_outputs.
 Above, it has been documented how to easily load this data using our provided scripts.
 
-Finally, should the artifact reviewer like to benchmark on larger graphs, we kindly ask them how much available RAM they have.
-We are happy to then provide additional benchmark scripts doing all benchmarks possible within this constraint, allowing to reproduce the experiments on larger graphs too, confirming that scalability proceeds as to be expected from the smaller benchmarks.
+Finally, should it be desired to benchmark for larger graphs, it is simple to extend the given benchmark scripts to larger graph instances, within the actual RAM constraint, confirming that scalability proceeds as to be expected from the smaller benchmarks.
 Note that this will also consume more time.
 
 

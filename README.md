@@ -201,17 +201,10 @@ This demo is carefully designed so that RAM utilization per party remains below 
 Hence, with 12 GB RAM available for the benchmarks, all three parties can be started on the same machine, locally emulating a network.
 Also, it just does 3 iterations for each configuration.
 
-Before running the benchmarks, please ensure that build/benchmarks/p0, build/benchmarks/p1, and build/benchmarks/p2 do not exist or are empty, potentially delete all files inside.
-These directories may still contain files from past benchmark runs if this is not your first benchmark of MultiCent.
-This will not directly influence benchmarking, but if there is an overlap of benchmarks, new data is just appended.
-Our provided scripts may then later be unable to correctly parse the benchmark data or do so incorrectly:
-```sh
-rm -rf p0
-rm -rf p1
-rm -rf p2
-```
+Note that starting a benchmark will first delete any prior results from the same benchmark if the benchmark has been started before.
+This is to avoid any duplicate datapoints which would otherwise lead to problems when parsing the data later.
 
-Then, run the LAN benchmarks.
+Now, run the LAN benchmarks.
 Our script will automatically enable the network simulation and disable it in the end again.
 If you terminate the script early, simply run ```./network_off.sh``` to stop the artificial network simulation again.
 We recommend working in the Docker container as this will momentarily change the behavior of your loopback interface.
@@ -220,7 +213,6 @@ Running this script will take approx. 1 hour.
 ./small_LAN_benchmarks.sh
 ```
 After the LAN benchmarks finished, you can proceed with the WAN benchmarks.
-Do **not** delete build/benchmarks/p0 etc. if previously generated from the LAN benchmarks.
 Running this script will take approx. 40 minutes.
 ```sh
 ./small_WAN_benchmarks.sh

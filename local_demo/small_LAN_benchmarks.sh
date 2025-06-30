@@ -16,19 +16,25 @@ mkdir -p p0
 mkdir -p p1
 mkdir -p p2
 
+# Delete potential benchmark data from prior runs that are to be produced by this script
+# (otherwise, there will be duplicate data points, leading to problems when plotting)
+rm -f p0/output_pi_*
+rm -f p1/output_pi_*
+rm -f p2/output_pi_*
+
 ./network_lan.sh || exit 1
 
 run_benchmark() {
-    ./$1_benchmark --pid 0 -n $2 -s $3 -d $4 -o p0/output_$1_$5.txt -r $6 --localhost --port $CURRENT_PORT > /dev/null &
-    ./$1_benchmark --pid 2 -n $2 -s $3 -d $4 -o p2/output_$1_$5.txt -r $6 --localhost --port $CURRENT_PORT > /dev/null &
-    ./$1_benchmark --pid 1 -n $2 -s $3 -d $4 -o p1/output_$1_$5.txt -r $6 --localhost --port $CURRENT_PORT
+    ./$1_benchmark --pid 0 -n $2 -s $3 -d $4 -o p0/output_$1_$5.txt -r $6 --localhost --port $CURRENT_PORT >> p0/log.txt 2>&1 &
+    ./$1_benchmark --pid 2 -n $2 -s $3 -d $4 -o p2/output_$1_$5.txt -r $6 --localhost --port $CURRENT_PORT >> p2/log.txt 2>&1 &
+    ./$1_benchmark --pid 1 -n $2 -s $3 -d $4 -o p1/output_$1_$5.txt -r $6 --localhost --port $CURRENT_PORT 2>&1 | tee -a p1/log.txt
     rotate_ports
 }
 
 run_benchmark_ref() {
-    ./$1_ref_benchmark --pid 0 -n $2 -l $3 -d $4 -o p0/output_$1_ref_$5.txt -r $6 --localhost --port $CURRENT_PORT > /dev/null &
-    ./$1_ref_benchmark --pid 2 -n $2 -l $3 -d $4 -o p2/output_$1_ref_$5.txt -r $6 --localhost --port $CURRENT_PORT > /dev/null &
-    ./$1_ref_benchmark --pid 1 -n $2 -l $3 -d $4 -o p1/output_$1_ref_$5.txt -r $6 --localhost --port $CURRENT_PORT
+    ./$1_ref_benchmark --pid 0 -n $2 -l $3 -d $4 -o p0/output_$1_ref_$5.txt -r $6 --localhost --port $CURRENT_PORT >> p0/log.txt 2>&1 &
+    ./$1_ref_benchmark --pid 2 -n $2 -l $3 -d $4 -o p2/output_$1_ref_$5.txt -r $6 --localhost --port $CURRENT_PORT >> p2/log.txt 2>&1 &
+    ./$1_ref_benchmark --pid 1 -n $2 -l $3 -d $4 -o p1/output_$1_ref_$5.txt -r $6 --localhost --port $CURRENT_PORT 2>&1 | tee -a p1/log.txt
     rotate_ports
 }
 
