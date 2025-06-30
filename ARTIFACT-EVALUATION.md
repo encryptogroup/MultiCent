@@ -47,18 +47,18 @@ Hence, only git and docker (including docker-buildx) need to be available to acc
 
 ### Accessibility (All badges)
 Repository publicly available on GitHub: [https://github.com/encryptogroup/MultiCent](https://github.com/encryptogroup/MultiCent).
-Specifically, the version to review is [release v0.1.0](https://github.com/encryptogroup/MultiCent/releases/tag/v0.1.0) which,
+Specifically, the version to review is [release v0.1.1](https://github.com/encryptogroup/MultiCent/releases/tag/v0.1.1) which,
 as an asset, also comes with a ready-to-use docker image.
 
 ### Set up the environment (Only for Functional and Reproduced badges)
 Docker (including docker-buildx) and git need to be available on the host system.
 Note that for setting up the container, you have to pick one of the choices presented in the script below:
-Either build the container yourself, or download the [image provided as a release asset on GitHub](https://github.com/encryptogroup/MultiCent/releases/download/v0.1.0/multicent_image.tar.gz) and simply load it.
+Either build the container yourself, or download the [image provided as a release asset on GitHub](https://github.com/encryptogroup/MultiCent/releases/download/v0.1.1/multicent_image.tar.gz) and simply load it.
 The image was build on x86_64 and *should* work on most common and sufficiently modern CPUs of that architecture.
 ```sh
 git clone git@github.com:encryptogroup/MultiCent.git 
 cd MultiCent
-git checkout v0.1.0
+git checkout v0.1.1
 
 # Setting up and running container:
 
