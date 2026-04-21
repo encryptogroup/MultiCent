@@ -10,4 +10,4 @@ add_library(MultiCent
 
 
 target_include_directories(MultiCent PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(MultiCent PUBLIC Boost::system EMPTool NTL GMP)
+target_link_libraries(MultiCent PUBLIC EMPTool NTL GMP)

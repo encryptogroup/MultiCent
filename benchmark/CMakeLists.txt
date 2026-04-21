@@ -9,7 +9,7 @@ macro(add_benchmark source_name)
     else()
         target_compile_options(${source_name} PRIVATE -Wall -Wextra -Wpedantic)
     endif()
-    target_link_libraries(${source_name} Boost::system Boost::program_options nlohmann_json::nlohmann_json MultiCent Threads::Threads NTL GMP EMPTool)
+    target_link_libraries(${source_name} Boost::program_options nlohmann_json::nlohmann_json MultiCent Threads::Threads NTL GMP EMPTool)
     list(APPEND benchbin ${source_name})
 endmacro()
 
