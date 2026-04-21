@@ -16,16 +16,16 @@ bpo::options_description bench::programOptions() {
     desc.add_options()
         ("pid,p", bpo::value<size_t>()->required(), "Party ID.")
         ("threads,t", bpo::value<size_t>()->default_value(6), "Number of threads (recommended 6).")
-        ("seed_self_h", bpo::value<size_t>()->default_value(100), "Value of the private random seed, high bits.")
-        ("seed_self_l", bpo::value<size_t>()->default_value(0), "Value of the random seed, low bits (will add pid if 0/default).")
-        ("seed_all_h", bpo::value<size_t>()->default_value(4), "Value of the global random seed, high bits.")
-        ("seed_all_l", bpo::value<size_t>()->default_value(8), "Value of the global random seed, low bits.")
-        ("seed_01_h", bpo::value<size_t>()->default_value(15), "Value of the 01-shared random seed, high bits.")
-        ("seed_01_l", bpo::value<size_t>()->default_value(16), "Value of the 01-shared random seed, low bits.")
-        ("seed_02_h", bpo::value<size_t>()->default_value(23), "Value of the 02-shared random seed, high bits.")
-        ("seed_02_l", bpo::value<size_t>()->default_value(42), "Value of the 02-shared random seed, low bits.")
-        ("seed_12_h", bpo::value<size_t>()->default_value(108), "Value of the 12-shared random seed, high bits.")
-        ("seed_12_l", bpo::value<size_t>()->default_value(1337), "Value of the 12-shared random seed, low bits.")
+        ("seed_self_h", bpo::value<uint64_t>()->default_value(100), "Value of the private random seed, high bits.")
+        ("seed_self_l", bpo::value<uint64_t>()->default_value(0), "Value of the random seed, low bits (will add pid if 0/default).")
+        ("seed_all_h", bpo::value<uint64_t>()->default_value(4), "Value of the global random seed, high bits.")
+        ("seed_all_l", bpo::value<uint64_t>()->default_value(8), "Value of the global random seed, low bits.")
+        ("seed_01_h", bpo::value<uint64_t>()->default_value(15), "Value of the 01-shared random seed, high bits.")
+        ("seed_01_l", bpo::value<uint64_t>()->default_value(16), "Value of the 01-shared random seed, low bits.")
+        ("seed_02_h", bpo::value<uint64_t>()->default_value(23), "Value of the 02-shared random seed, high bits.")
+        ("seed_02_l", bpo::value<uint64_t>()->default_value(42), "Value of the 02-shared random seed, low bits.")
+        ("seed_12_h", bpo::value<uint64_t>()->default_value(108), "Value of the 12-shared random seed, high bits.")
+        ("seed_12_l", bpo::value<uint64_t>()->default_value(1337), "Value of the 12-shared random seed, low bits.")
         ("net-config", bpo::value<std::string>(), "Path to JSON file containing network details of all parties.")
         ("localhost", bpo::bool_switch(), "All parties are on same machine.")
 
@@ -85,10 +85,8 @@ void bench::setupBenchmark(const bpo::variables_map& opts, size_t& pid, size_t& 
         save_output = true;
         save_file = opts["output"].as<std::string>();
     }
-
     pid = opts["pid"].as<size_t>();
     threads = opts["threads"].as<size_t>();
-
     seeds_h[0] = opts["seed_self_h"].as<uint64_t>();
     seeds_h[1] = opts["seed_all_h"].as<uint64_t>();
     seeds_h[2] = opts["seed_01_h"].as<uint64_t>();
