@@ -72,7 +72,7 @@ namespace subcirc {
                                             std::vector<std::vector<common::utils::wire_t>> &destination_bits,
                                             std::vector<common::utils::wire_t> &vertex_flags,
                                             std::vector<common::utils::wire_t> &payload,
-                                            ommon::utils::Circuit<Ring> &circ,
+                                            common::utils::Circuit<Ring> &circ,
                                             size_t &next_free_shuffle_id,
                                             size_t n,
                                             size_t nmbr_bits,

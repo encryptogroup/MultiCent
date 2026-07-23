@@ -666,7 +666,7 @@ std::vector<common::utils::wire_t> subcirc::pi_1_reference( std::vector<std::vec
     return res;
 }
 
-std::vector<common::utils::wire_t> subcirc::bfs(std::vector<std::vector<common::utils::wire_t>> &source_bits, std::vector<std::vector<common::utils::wire_t>> &destination_bits, std::vector<common::utils::wire_t> &vertex_flags, std::vector<common::utils::wire_t> &payload, ommon::utils::Circuit<Ring> &circ, size_t &next_free_shuffle_id, size_t n, size_t nmbr_bits, size_t depth) {
+std::vector<common::utils::wire_t> subcirc::bfs(std::vector<std::vector<common::utils::wire_t>> &source_bits, std::vector<std::vector<common::utils::wire_t>> &destination_bits, std::vector<common::utils::wire_t> &vertex_flags, std::vector<common::utils::wire_t> &payload, common::utils::Circuit<Ring> &circ, size_t &next_free_shuffle_id, size_t n, size_t nmbr_bits, size_t depth) {
     std::vector<common::utils::wire_t> flipped_vertex_flags = circ.addMGate(common::utils::GateType::kFlip, vertex_flags);
     auto rho_0_source = circ.addMGate(common::utils::GateType::kGenCompaction, flipped_vertex_flags);
     auto perm_source = rho_0_source;
