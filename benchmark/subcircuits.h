@@ -68,6 +68,16 @@ namespace subcirc {
                                             size_t nmbr_bits,
                                             std::vector<Ring> &weights);
 
+    std::vector<common::utils::wire_t> bfs( std::vector<std::vector<common::utils::wire_t>> &source_bits,
+                                            std::vector<std::vector<common::utils::wire_t>> &destination_bits,
+                                            std::vector<common::utils::wire_t> &vertex_flags,
+                                            std::vector<common::utils::wire_t> &payload,
+                                            ommon::utils::Circuit<Ring> &circ,
+                                            size_t &next_free_shuffle_id,
+                                            size_t n,
+                                            size_t nmbr_bits,
+                                            size_t depth);
+
     /**
      * Runs the entire reference (based on matrix multiplication) graph analysis for pi_3 and returns wires for the values per node.
      * 

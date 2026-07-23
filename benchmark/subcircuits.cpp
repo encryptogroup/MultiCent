@@ -665,3 +665,55 @@ std::vector<common::utils::wire_t> subcirc::pi_1_reference( std::vector<std::vec
 
     return res;
 }
+
+std::vector<common::utils::wire_t> subcirc::bfs(std::vector<std::vector<common::utils::wire_t>> &source_bits, std::vector<std::vector<common::utils::wire_t>> &destination_bits, std::vector<common::utils::wire_t> &vertex_flags, std::vector<common::utils::wire_t> &payload, ommon::utils::Circuit<Ring> &circ, size_t &next_free_shuffle_id, size_t n, size_t nmbr_bits, size_t depth) {
+    std::vector<common::utils::wire_t> flipped_vertex_flags = circ.addMGate(common::utils::GateType::kFlip, vertex_flags);
+    auto rho_0_source = circ.addMGate(common::utils::GateType::kGenCompaction, flipped_vertex_flags);
+    auto perm_source = rho_0_source;
+    for (size_t j = 0; j < nmbr_bits; j++) {
+        perm_source = optimizedSortingIteration(perm_source, source_bits[j], circ, next_free_shuffle_id);
+    }
+    auto rho_0_dest = circ.addMGate(common::utils::GateType::kGenCompaction, vertex_flags);
+    auto perm_dest = rho_0_dest;
+    for (size_t j = 0; j < nmbr_bits; j++) {
+        perm_dest = optimizedSortingIteration(perm_dest, destination_bits[j], circ, next_free_shuffle_id);
+    }
+    auto perm_vertex = optimizedSortingIteration(perm_dest, flipped_vertex_flags, circ, next_free_shuffle_id);
+    auto [clear_shuffled_perm_vertex, shuffle_vertex, clear_shuffled_perm_source, shuffle_source, clear_shuffled_perm_dest, shuffle_dest] = prepare_message_passing_shufflings(perm_vertex, perm_source, perm_dest, circ, next_free_shuffle_id);
+    size_t dshuffle_v_to_s = next_free_shuffle_id;
+    size_t dshuffle_s_to_d = next_free_shuffle_id + 1;
+    size_t dshuffle_d_to_v = next_free_shuffle_id + 2;
+    next_free_shuffle_id += 3;
+    auto shuffled_payload = circ.addParamWithOptMGate(common::utils::GateType::kShuffle, payload, shuffle_vertex);
+    auto payload_vertex = circ.addMDoubleInGate(common::utils::GateType::kReorder, shuffled_payload, clear_shuffled_perm_vertex);
+    for (size_t i = 0; i < depth; i++) {
+        auto prior_payload_vertex = payload_vertex;
+        auto payload_vertex_prop = circ.addParamMGate(common::utils::GateType::kPreparePropagate, payload_vertex, n);
+        shuffled_payload = circ.addMDoubleInGate(common::utils::GateType::kReorderInverse, payload_vertex_prop, clear_shuffled_perm_vertex);
+        auto shuffled_payload_correction = circ.addMDoubleInGate(common::utils::GateType::kReorderInverse, payload_vertex, clear_shuffled_perm_vertex);
+        shuffled_payload = circ.addThreeParamMGate(common::utils::GateType::kDoubleShuffle, shuffled_payload, dshuffle_v_to_s, shuffle_vertex, shuffle_source);
+        shuffled_payload_correction = circ.addThreeParamMGate(common::utils::GateType::kDoubleShuffle, shuffled_payload_correction, dshuffle_v_to_s, shuffle_vertex, shuffle_source);
+        auto payload_source = circ.addMDoubleInGate(common::utils::GateType::kReorder, shuffled_payload, clear_shuffled_perm_source);
+        auto payload_correction = circ.addMDoubleInGate(common::utils::GateType::kReorder, shuffled_payload_correction, clear_shuffled_perm_source);
+        payload_source = circ.addMDoubleInGate(common::utils::GateType::kPropagate, payload_source, payload_correction);
+        shuffled_payload = circ.addMDoubleInGate(common::utils::GateType::kReorderInverse, payload_source, clear_shuffled_perm_source);
+        shuffled_payload = circ.addThreeParamMGate(common::utils::GateType::kDoubleShuffle, shuffled_payload, dshuffle_s_to_d, shuffle_source, shuffle_dest);
+        auto payload_dest = circ.addMDoubleInGate(common::utils::GateType::kReorder, shuffled_payload, clear_shuffled_perm_dest);
+        payload_dest = circ.addMGate(common::utils::GateType::kPrepareGather, payload_dest);
+        shuffled_payload = circ.addMDoubleInGate(common::utils::GateType::kReorderInverse, payload_dest, clear_shuffled_perm_dest);
+        shuffled_payload = circ.addThreeParamMGate(common::utils::GateType::kDoubleShuffle, shuffled_payload, dshuffle_d_to_v, shuffle_dest, shuffle_vertex);
+        payload_vertex = circ.addMDoubleInGate(common::utils::GateType::kReorder, shuffled_payload, clear_shuffled_perm_vertex);
+        payload_vertex = circ.addParamMGate(common::utils::GateType::kGather, payload_vertex, n);
+        payload_vertex = circ.addMDoubleInGate(common::utils::GateType::kAddVec, payload_vertex, prior_payload_vertex);
+    }
+    for(size_t k = 0; k < n; k++) {
+        auto eqz = circ.addParamGate(common::utils::GateType::kEqualsZero, payload_vertex[k], 0);
+        eqz = circ.addParamGate(common::utils::GateType::kEqualsZero, eqz, 1);
+        eqz = circ.addParamGate(common::utils::GateType::kEqualsZero, eqz, 2);
+        eqz = circ.addParamGate(common::utils::GateType::kEqualsZero, eqz, 3);
+        eqz = circ.addParamGate(common::utils::GateType::kEqualsZero, eqz, 4);
+        payload_vertex[k] = circ.addGate(common::utils::GateType::kConvertB2A, eqz);
+    }
+    payload_vertex = circ.addMGate(common::utils::GateType::kFlip, payload_vertex);
+    return payload_vertex;
+}
