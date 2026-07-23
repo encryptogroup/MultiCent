@@ -31,7 +31,7 @@ add_benchmark(pi_1_test)
 add_benchmark(pi_1_benchmark)
 add_benchmark(pi_1_ref_test)
 add_benchmark(pi_1_ref_benchmark)
-add_benchmark(bfsbenchmark)
+add_benchmark(bfs_benchmark)
 
 add_custom_target(benchmarks)
 add_dependencies(benchmarks ${benchbin})
