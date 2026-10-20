@@ -6,7 +6,20 @@ It includes the instantiation of three specific centrality measures within the f
 
 **Check out [our paper](https://eprint.iacr.org/2025/652), accepted at PETs'25, for details!**
 
-:warning: This code is a prototype implementation and should not be used in production.
+> [!NOTE]
+> **This implementation of MultiCent is obsolete.**
+> Check out the [PPGA framework](https://github.com/encryptogroup/PPGA-Graph-MPC) ([corrsponding paper](https://eprint.iacr.org/2026/2550))
+> for an improved and generalized implementation of MultiCent, significantly improving RAM utilization and speed and providing a user-friendly
+> high-level interface to define custom message-passing algorithms.
+>
+> [PPGA](https://github.com/encryptogroup/PPGA-Graph-MPC) implements the same MPC protocol and includes presets to compute all centrality measures
+> considered in [MultiCent](https://eprint.iacr.org/2025/652). Hence, PPGA renders MultiCent obsolete.
+> Any comparison to the MultiCent protocol is recommended to use its cleaner and better implementation in [PPGA](https://github.com/encryptogroup/PPGA-Graph-MPC).
+> The repository here is only kept for archiving reasons, as it contains the code artifact that the original benchmark numbers in the
+> [MultiCent paper](https://eprint.iacr.org/2025/652), using the original and less efficient prototype implementation, are based on.
+
+> [!WARNING]
+> This code is a prototype implementation and should not be used in production.
 
 ### Framework for Message-Passing Algorithms
 
